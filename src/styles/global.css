@@ -1,0 +1,85 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap");
+
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --ink: #16213a;
+  --muted: #5d6781;
+  --line: #d9dde6;
+  --accent: #e0533a;
+  --accent-2: #1f6f8b;
+  --font-head: "Bricolage Grotesque", system-ui, sans-serif;
+  --font-body: "Source Serif 4", Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1.125rem;
+  line-height: 1.7;
+}
+h1, h2, h3 { font-family: var(--font-head); line-height: 1.1; margin: 0 0 1rem; }
+h1 { font-size: clamp(2.6rem, 7vw, 5.5rem); letter-spacing: -0.02em; }
+h2 { font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -0.01em; }
+p { max-width: 62ch; margin: 0 0 1rem; }
+
+/* Header */
+.hero {
+  min-height: 92vh;
+  display: grid;
+  align-content: center;
+  padding: 4rem clamp(1.25rem, 6vw, 6rem);
+  background: var(--ink);
+  color: #fff;
+}
+.hero p { color: #c4cbe0; font-size: 1.25rem; }
+.hero small { color: #8d97b5; }
+
+/* Section */
+.story-section {
+  padding: clamp(3rem, 8vw, 6rem) clamp(1.25rem, 6vw, 6rem);
+  border-bottom: 1px solid var(--line);
+}
+.story-section:nth-of-type(even) { background: var(--surface); }
+.story-text { margin-bottom: 2rem; }
+.chart-wrap { width: 100%; position: relative; }
+.chart-wrap svg { display: block; width: 100%; height: auto; }
+.note { color: var(--muted); font-size: 0.95rem; }
+.error-box {
+  padding: 1rem 1.25rem;
+  border: 1px dashed var(--accent);
+  color: var(--accent);
+  font-family: var(--font-head);
+}
+
+/* Tooltip */
+.tooltip {
+  position: fixed;
+  pointer-events: none;
+  background: var(--ink);
+  color: #fff;
+  padding: 0.4rem 0.7rem;
+  border-radius: 4px;
+  font: 500 0.85rem var(--font-head);
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 50;
+}
+
+/* Footer */
+.footer {
+  padding: 3rem clamp(1.25rem, 6vw, 6rem);
+  background: var(--ink);
+  color: #c4cbe0;
+  font-size: 0.95rem;
+}
+.footer a { color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  * { transition: none !important; }
+}
