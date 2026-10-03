@@ -5,12 +5,12 @@ import { getTooltip } from "../../hooks/useTooltip";
 import { groupColor } from "../../utils/colors";
 
 export default function Sunburst({ data }) {
-  const [wrapRef, width] = useSize();
+  cconst [wrapRef, width, boxH] = useSize();
   const svgRef = useRef(null);
 
   useEffect(() => {
     if (!data) return;
-    const size = Math.min(width, 640);
+    const size = Math.min(width, Math.max(320, boxH));
     const radius = size / 2;
     const svg = d3.select(svgRef.current).attr("viewBox", [-size / 2, -size / 2, size, size]);
     svg.selectAll("*").remove();

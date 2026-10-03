@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 
-// Mengembalikan [ref, width] supaya chart responsif
+// Mengembalikan [ref, width, height] dari elemen yang diamati
 export function useSize(initial = 800) {
   const ref = useRef(null);
-  const [width, setWidth] = useState(initial);
+  const [size, setSize] = useState({ width: initial, height: 0 });
 
   useEffect(() => {
     if (!ref.current) return;
-    const ro = new ResizeObserver(([e]) => setWidth(Math.max(280, e.contentRect.width)));
+    const ro = new ResizeObserver(([e]) => {
+      const { width, height } = e.contentRect;
+      setSize({
+        width: Math.max(280, Math.round(width)),
+        height: Math.round(height),
+      });
+    });
     ro.observe(ref.current);
     return () => ro.disconnect();
   }, []);
 
-  return [ref, width];
+  return [ref, size.width, size.height];
 }

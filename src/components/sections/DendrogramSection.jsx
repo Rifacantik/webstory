@@ -99,6 +99,7 @@ export default function DendrogramSection() {
   return (
     <StorySection
       id="dendrogram"
+      fill={false}
       title="Provinsi Mana Saja yang Membentuk Kelompok Serupa?"
       text={
         <p>

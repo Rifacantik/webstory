@@ -15,12 +15,12 @@ const FIT = 0.7;        // wilayah memenuhi ±70% layar saat di-zoom
 // Kursor keluar dari peta -> zoom kembali ke seluruh Indonesia.
 // getNote(feature) -> string HTML interpretasi (opsional), ditampilkan di tooltip saat hover
 export default function Choropleth({ geo, getValue, getName, getNote, label = "Nilai" }) {
-  const [wrapRef, width] = useSize();
+  const [wrapRef, width, boxH] = useSize();
   const svgRef = useRef(null);
 
   useEffect(() => {
     if (!geo || !width) return;
-    const height = width * 0.45;
+    const height = Math.max(320, boxH);
     const svg = d3.select(svgRef.current).attr("viewBox", `0 0 ${width} ${height}`);
     svg.interrupt();
     svg.selectAll("*").remove();

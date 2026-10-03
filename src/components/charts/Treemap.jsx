@@ -6,12 +6,12 @@ import { groupColor } from "../../utils/colors";
 
 // data: { name, children: [{ name, children|value }] }
 export default function Treemap({ data }) {
-  const [wrapRef, width] = useSize();
+  const [wrapRef, width, boxH] = useSize(); 
   const svgRef = useRef(null);
 
   useEffect(() => {
     if (!data) return;
-    const height = Math.min(560, width * 0.6);
+    const height = Math.max(320, boxH);
     const svg = d3.select(svgRef.current).attr("viewBox", `0 0 ${width} ${height}`);
     svg.selectAll("*").remove();
 
