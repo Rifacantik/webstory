@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import PCAPlot from "../charts/PCAPlot";
 import PCAInterpretation from "./PCAInterpretation";
+import SourceNote from "../layout/SourceNote";
 import { runPCA } from "../../utils/pca";
 import { getIsland } from "../../utils/regions";
 import { useClusterResult, FEATURES } from "../../hooks/useClusterResult";
@@ -30,6 +31,8 @@ export default function PCASection() {
     };
   }, [rows, cut]);
 
+  const ready = pcaResult.points.length > 0;
+
   return (
     <section id="pca" className="pca-section">
       <header className="pca-section__head">
@@ -49,15 +52,18 @@ export default function PCASection() {
       <div className="pca-scrolly">
         <div className="pca-scrolly__chart">
           <div className="pca-card pca-chart-card">
-            {pcaResult.points.length > 0 ? (
-              <PCAPlot
-                points={pcaResult.points}
-                variance={pcaResult.variance}
-                focus={focus}
-              />
+            {ready ? (
+              <div className="pca-chart-main">
+                <PCAPlot
+                  points={pcaResult.points}
+                  variance={pcaResult.variance}
+                  focus={focus}
+                />
+              </div>
             ) : (
               <div className="pca-chart-placeholder">Memuat grafik…</div>
             )}
+            {ready && <SourceNote />}
           </div>
         </div>
 

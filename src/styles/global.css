@@ -144,8 +144,13 @@ p { max-width: 62ch; margin: 0 0 1rem; }
 }
 
 /* Chart sederhana: diregangkan memenuhi kolom */
+.chart-wrap--fill {
+  display: flex;
+  flex-direction: column;
+}
 .chart-wrap--fill > div {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -172,4 +177,27 @@ p { max-width: 62ch; margin: 0 0 1rem; }
 }
 .story-section--free .chart-wrap {
   height: auto;
+}
+
+/* Teks rata atas (sejajar dengan bagian atas chart), mis. Circle Packing */
+.story-section--top .story-text {
+  align-self: start;
+}
+.story-section--top .story-text h2 {
+  margin-top: 0;
+}
+
+/* Keterangan sumber data di bawah grafik */
+.source-note {
+  flex: none;
+  width: 100%;
+  max-width: none;
+  margin: 1.5rem 0 0;      /* jarak dari grafik / legenda */
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--line);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--muted);
 }

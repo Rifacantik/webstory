@@ -1,50 +1,138 @@
 import { motion } from "framer-motion";
 
 const f = (v) =>
-  v.toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  v.toLocaleString("id-ID", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
-// stats: [{ id, n, mean, min: {name, ipm}, max: {name, ipm}, names: [] }]
-export default function CirclePackingInterpretation({ stats = [] }) {
+export default function CirclePackingInterpretation({
+  stats = [],
+  selectedCluster = null,
+}) {
   if (!stats.length) return null;
 
-  // contoh tumpang tindih: IPM tertinggi klaster "bawah" > IPM terendah klaster "atas"
-  const asc = [...stats].sort((a, b) => a.mean - b.mean);
-  let overlap = null;
-  for (let i = 0; i < asc.length - 1 && !overlap; i++) {
-    for (let j = i + 1; j < asc.length; j++) {
-      if (asc[i].max.ipm > asc[j].min.ipm) {
-        overlap = { low: asc[i], high: asc[j] };
-        break;
-      }
-    }
+  const selected = stats.find((s) => s.id === selectedCluster);
+
+  if (!selected) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4 }}
+        style={{
+          marginTop: "1.25rem",
+          padding: "1rem 1.15rem",
+          borderLeft: "4px solid #9aa7bd",
+          background: "#f4f7fd",
+          borderRadius: 10,
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: "0.98rem",
+            fontWeight: 600,
+            color: "#5d6781",
+            lineHeight: 1.5,
+          }}
+        >
+          Klik salah satu klaster untuk melihat interpretasi.
+        </p>
+      </motion.div>
+    );
+  }
+
+  const isSingle = selected.n === 1;
+
+  let title = "";
+  let description = "";
+
+  if (selected.id === 1) {
+    title = "Klaster 1 — IPM Tertinggi";
+    description = isSingle
+      ? `Klaster 1 hanya beranggotakan ${selected.min.name} dengan IPM ${f(
+          selected.min.ipm
+        )}. Nilai tersebut merupakan capaian IPM tertinggi dibandingkan provinsi lainnya.`
+      : `Klaster 1 terdiri dari ${selected.n} provinsi dengan rata-rata IPM ${f(
+          selected.mean
+        )}. Rentang IPM berada pada ${f(selected.min.ipm)} hingga ${f(
+          selected.max.ipm
+        )}.`;
+  } else if (selected.id === 2) {
+    title = "Klaster 2 — IPM Relatif Rendah";
+    description = `Klaster 2 terdiri dari ${selected.n} provinsi dengan rata-rata IPM ${f(
+      selected.mean
+    )}. Nilainya berkisar dari ${selected.min.name} (${f(
+      selected.min.ipm
+    )}) hingga ${selected.max.name} (${f(selected.max.ipm)}).`;
+  } else if (selected.id === 3) {
+    title = "Klaster 3 — Kelompok Terbesar";
+    description = `Klaster 3 mencakup ${selected.n} provinsi dengan rata-rata IPM ${f(
+      selected.mean
+    )}. Nilainya berkisar dari ${selected.min.name} (${f(
+      selected.min.ipm
+    )}) hingga ${selected.max.name} (${f(selected.max.ipm)}).`;
+  } else {
+    title = `Klaster ${selected.id}`;
+    description = `Klaster ${selected.id} terdiri dari ${
+      selected.n
+    } provinsi dengan rata-rata IPM ${f(selected.mean)}, dengan rentang ${
+      selected.min.name
+    } (${f(selected.min.ipm)}) hingga ${selected.max.name} (${f(
+      selected.max.ipm
+    )}).`;
   }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.6 }}
-      transition={{ duration: 0.6 }}
+      key={selected.id}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
       style={{
-        marginTop: "1.5rem",
-        padding: "1rem 1.25rem",
+        marginTop: "1.25rem",
+        padding: "1rem 1.15rem",
         borderLeft: "4px solid #2a6fdb",
         background: "#f4f7fd",
         borderRadius: 10,
       }}
     >
-      <p style={{ margin: 0, fontSize: "1.05rem", fontWeight: 600, color: "#2b3350", lineHeight: 1.5 }}>
-        Klaster tidak dibentuk berdasarkan IPM saja, tetapi berdasarkan seluruh
-        indikator sosial-ekonomi. Karena itu, nilai IPM antarklaster masih
-        dapat saling tumpang tindih.
+      <h3
+        style={{
+          margin: "0 0 0.45rem",
+          fontSize: "1rem",
+          fontWeight: 700,
+          color: "#10213a",
+        }}
+      >
+        {title}
+      </h3>
+
+      <p
+        style={{
+          margin: 0,
+          fontSize: "0.92rem",
+          color: "#3f4b65",
+          lineHeight: 1.6,
+        }}
+      >
+        {description}
       </p>
-      {overlap && (
-        <p style={{ margin: "0.5rem 0 0", fontSize: "0.9rem", color: "#5d6781" }}>
-          Contoh: {overlap.low.max.name} (Klaster {overlap.low.id}, IPM{" "}
-          {f(overlap.low.max.ipm)}) lebih tinggi daripada {overlap.high.min.name}{" "}
-          (Klaster {overlap.high.id}, IPM {f(overlap.high.min.ipm)}).
-        </p>
-      )}
+
+      <div
+        style={{
+          marginTop: "0.7rem",
+          paddingTop: "0.65rem",
+          borderTop: "1px solid #dce3ef",
+          fontSize: "0.84rem",
+          color: "#5d6781",
+          lineHeight: 1.5,
+        }}
+      >
+        <strong>Catatan:</strong> Klaster dibentuk berdasarkan seluruh
+        indikator sosial-ekonomi, bukan berdasarkan IPM saja.
+      </div>
     </motion.div>
   );
 }

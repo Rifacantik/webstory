@@ -49,7 +49,15 @@
 
 .pca-chart-card {
   height: 100%;
-  padding: 1rem 1.25rem 1.25rem;
+  padding: 1rem 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+/* area grafik mengisi sisa tinggi kartu, keterangan sumber tetap di bawah */
+.pca-chart-main {
+  flex: 1;
+  min-height: 0;
 }
 
 .pca-chart-placeholder {
