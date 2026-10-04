@@ -26,6 +26,8 @@
   grid-column: 1;
   grid-row: 1;
   padding: 18vh 0 30vh;
+  position: relative;
+  z-index: 3;
 }
 
 .pca-scrolly__chart {
@@ -71,17 +73,25 @@
 /* kotak interpretasi */
 .pca-step {
   margin-bottom: 32vh;
-  opacity: 0.5;
+  background: #fff;                 /* latar selalu solid, plot tidak tembus */
   border-left: 4px solid transparent;
-  transition: opacity 0.35s, border-color 0.35s, box-shadow 0.35s;
+  position: relative;
+  z-index: 3;                       /* di atas grafik sticky */
+  transition: border-color 0.35s, box-shadow 0.35s;
+}
+.pca-step > * {
+  opacity: 0.5;                     /* yang diredupkan hanya isinya */
+  transition: opacity 0.35s;
 }
 .pca-step:last-child {
   margin-bottom: 0;
 }
 .pca-step.is-active {
-  opacity: 1;
   border-left-color: var(--pca-accent);
   box-shadow: 0 6px 20px rgba(20, 30, 60, 0.12);
+}
+.pca-step.is-active > * {
+  opacity: 1;
 }
 
 .pca-step__eyebrow {
@@ -135,6 +145,8 @@
     grid-column: 1;
     grid-row: 2;
     padding-top: 4vh;
+    position: relative;
+    z-index: 3;
   }
   .pca-step {
     margin-bottom: 24vh;
