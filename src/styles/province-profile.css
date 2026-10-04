@@ -1,0 +1,178 @@
+/* Panel interpretasi profil provinsi (Parallel Coordinates) */
+
+.pv-card {
+  --pv-good: #0072b2;   /* Okabe-Ito biru */
+  --pv-weak: #d55e00;   /* Okabe-Ito oranye */
+  --pv-neutral: #8a93a8;
+  margin-top: 1.1rem;
+  padding: 1rem 1.15rem;
+  background: #fff;
+  border: 1px solid rgba(20, 30, 60, 0.1);
+  border-radius: 14px;
+  box-shadow: 0 1px 3px rgba(20, 30, 60, 0.06);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  text-align: left;
+}
+.pv-card p {
+  max-width: none;
+  margin: 0 0 0.5rem;
+}
+
+.pv-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+.pv-guide {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+.pv-guide li {
+  margin: 0 0 0.35rem;
+}
+
+/* kepala */
+.pv-head {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 0.6rem;
+}
+.pv-swatch {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+.pv-head__text {
+  flex: 1;
+  min-width: 0;
+}
+.pv-name {
+  margin: 0;
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+.pv-sub {
+  color: var(--muted, #5d6781);
+  font-size: 0.85rem;
+}
+.pv-clear {
+  flex: none;
+  padding: 0.2rem 0.65rem;
+  border: 1px solid #c9d0e0;
+  border-radius: 8px;
+  background: #fff;
+  color: #2b3350;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.pv-clear:hover {
+  background: #f1f3f8;
+}
+
+/* ringkasan */
+.pv-headline {
+  font-weight: 600;
+}
+.pv-tag {
+  color: var(--ink, #16213a);
+}
+.pv-tag--baik {
+  color: var(--pv-good);
+}
+.pv-tag--lemah {
+  color: var(--pv-weak);
+}
+
+/* tabel indikator */
+.pv-rows {
+  list-style: none;
+  margin: 0.7rem 0 0.5rem;
+  padding: 0;
+  border-top: 1px solid var(--line, #d9dde6);
+}
+.pv-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) auto 72px 2.2rem;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.28rem 0;
+  border-bottom: 1px solid var(--line, #d9dde6);
+  font-size: 0.88rem;
+}
+.pv-row__val {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.pv-row__rank {
+  text-align: right;
+  color: var(--muted, #5d6781);
+  font-variant-numeric: tabular-nums;
+}
+
+.pv-track {
+  position: relative;
+  height: 4px;
+  margin: 0 6px;
+  border-radius: 2px;
+  background: #e3e7f0;
+}
+.pv-dot {
+  position: absolute;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 1px rgba(20, 30, 60, 0.25);
+}
+.pv-dot--baik {
+  background: var(--pv-good);
+}
+.pv-dot--lemah {
+  background: var(--pv-weak);
+}
+.pv-dot--netral {
+  background: var(--pv-neutral);
+}
+
+.pv-legend {
+  color: var(--muted, #5d6781);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+/* provinsi mirip */
+.pv-similar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+}
+.pv-similar span {
+  color: var(--muted, #5d6781);
+}
+.pv-similar button {
+  padding: 0.15rem 0.6rem;
+  border: 1px solid #c9d0e0;
+  border-radius: 999px;
+  background: #fff;
+  color: #2b3350;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+.pv-similar button:hover {
+  background: #eef2fb;
+  border-color: var(--pv-good);
+}
+.pv-clear:focus-visible,
+.pv-similar button:focus-visible {
+  outline: 2px solid var(--pv-good);
+  outline-offset: 2px;
+}

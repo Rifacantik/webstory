@@ -1,17 +1,18 @@
+import { clusterPalette } from "../../utils/clusters";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as d3 from "d3";
 import { useSize } from "../../hooks/useSize";
 import { getTooltip } from "../../hooks/useTooltip";
+import { textWidth, bodyFamily } from "../../utils/textFit";
 
-// Palet ramah buta warna (basis Okabe-Ito): ungu-kemerahan, oranye, biru.
-// Tiap klaster punya warna gelap (lingkaran luar) dan terang (lingkaran dalam).
+// Palet klaster kini satu sumber (utils/clusters.js), sama dengan Dendrogram, PCA, dan Kesimpulan.
+// Nama export lama dipertahankan agar CirclePackingInterpretation tidak rusak.
+export const getPalette = clusterPalette;
 export const CLUSTER_PALETTE = {
-  1: { outer: "#A23E7B", inner: "#F6D3E8" }, // 🩷 ungu-kemerahan
-  2: { outer: "#B35400", inner: "#FAD08A" }, // 🟠 oranye
-  3: { outer: "#0A2F55", inner: "#7DBBE8" }, // 🔵 biru
+  1: clusterPalette(1),
+  2: clusterPalette(2),
+  3: clusterPalette(3),
 };
-const FALLBACK = { outer: "#444444", inner: "#dddddd" };
-export const getPalette = (id) => CLUSTER_PALETTE[id] ?? FALLBACK;
 
 const TEXT = "#10213a";
 const ZOOM = 1.2; // pembesaran saat hover provinsi
@@ -29,19 +30,22 @@ function partitions(words, k) {
   return out;
 }
 
-// pilih pembagian 1-3 baris yang menghasilkan huruf terbesar di dalam lingkaran
+// pilih pembagian 1-3 baris yang menghasilkan huruf terbesar di dalam lingkaran.
+// Lebar teks diukur dengan font sebenarnya (bukan perkiraan 0,6em per huruf).
 function bestLayout(name, r) {
+  const fam = bodyFamily();
   const words = name.split(" ");
   let best = { fs: 0, lines: [name] };
   for (let k = 1; k <= Math.min(3, words.length); k++) {
     partitions(words, k).forEach((lines) => {
-      const maxLen = Math.max(...lines.map((l) => l.length));
-      // kotak teks (lebar ~0,6em per huruf, tinggi ~1,15em per baris) harus muat di dalam lingkaran
-      const fs = (0.9 * r) / Math.hypot((maxLen * 0.6) / 2, (lines.length * 1.15) / 2);
+      // lebar terpanjang dalam satuan em
+      const maxW = Math.max(...lines.map((l) => textWidth(l, `600 100px ${fam}`) / 100));
+      // kotak teks (maxW em lebar, ~1,15em per baris tinggi) harus muat di dalam lingkaran
+      const fs = (0.84 * r) / Math.hypot(maxW / 2, (lines.length * 1.15) / 2);
       if (fs > best.fs) best = { fs, lines };
     });
   }
-  return { lines: best.lines, fs: Math.max(5.5, Math.min(13, best.fs)) };
+  return { lines: best.lines, fs: Math.max(4.5, Math.min(13, best.fs)) };
 }
 
 // angka yang naik dari 0 ke nilai akhir
@@ -74,6 +78,12 @@ export default function CirclePackingPlot({ clusters }) {
   const playedRef = useRef(false);
   const [inView, setInView] = useState(false);
   const [active, setActive] = useState(null); // klaster yang disorot (kartu / lingkaran luar)
+
+  // tunggu font siap supaya pengukuran teks akurat
+  const [fontsReady, setFontsReady] = useState(false);
+  useEffect(() => {
+    (document.fonts?.ready ?? Promise.resolve()).then(() => setFontsReady(true));
+  }, []);
 
   // mulai animasi saat masuk layar
   useEffect(() => {
@@ -108,7 +118,7 @@ export default function CirclePackingPlot({ clusters }) {
 
   // ---- gambar grafik ----
   useEffect(() => {
-    if (!clusters?.length || !width) return;
+    if (!clusters?.length || !width || !fontsReady) return;
 
     const size = Math.min(width, 720);
     const padX = 24, padT = 46, padB = 24;
@@ -319,7 +329,7 @@ export default function CirclePackingPlot({ clusters }) {
     if (animate) {
       labels.attr("opacity", 0).transition("e").delay(1000).duration(600).attr("opacity", 1);
     }
-  }, [clusters, width, inView]);
+  }, [clusters, width, inView, fontsReady]);
 
   // ---- sorot klaster dari kartu / lingkaran luar ----
   useEffect(() => {

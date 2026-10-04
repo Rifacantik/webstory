@@ -1,0 +1,59 @@
+.province-select {
+  position: fixed;
+  left: 1rem;
+  bottom: 1rem;
+  z-index: 45;
+  width: min(250px, calc(100vw - 2rem));
+  padding: 0.6rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 24px rgba(16, 33, 58, 0.18);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(8px);
+  transition: opacity 0.3s, transform 0.3s, visibility 0.3s;
+}
+.province-select.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+.province-select label {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: var(--muted);
+  font-family: var(--font-head);
+  font-size: 0.8rem;
+}
+.province-select__row {
+  display: flex;
+  gap: 0.4rem;
+}
+.province-select input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid #c9d0e0;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--ink);
+  background: #fff;
+}
+.province-select input:focus-visible,
+.province-select button:focus-visible {
+  outline: 2px solid #2a6fdb;
+  outline-offset: 1px;
+}
+.province-select button {
+  flex: none;
+  width: 2rem;
+  border: 1px solid #c9d0e0;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}

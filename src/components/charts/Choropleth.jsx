@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import * as d3 from "d3";
+import { tile as d3Tile } from "d3-tile";
 import { useSize } from "../../hooks/useSize";
 import { getTooltip } from "../../hooks/useTooltip";
 import { sequential } from "../../utils/colors";
@@ -8,15 +9,54 @@ const DWELL_MS = 300;   // kursor harus diam sebentar di wilayah sebelum zoom (m
 const RESET_MS = 250;   // jeda sebelum zoom kembali saat kursor keluar dari peta
 const MAX_ZOOM = 14;    // batas pembesaran maksimum
 const FIT = 0.7;        // wilayah memenuhi ±70% layar saat di-zoom
+const EDGE = 24;        // jarak peta dari tepi area
+const FILL = 0.78;         // keburaman warna choropleth (sisanya memperlihatkan satelit)
+const DIM = 0.1;           // wilayah di luar provinsi terpilih
+const DIM_SIBLING = 0.35;  // kab/kota lain di provinsi yang sama, saat satu kab/kota dipilih
+const ACCENT = "#f97316";  // warna garis sorot wilayah terpilih
+const STROKE = "rgba(255,255,255,0.55)"; // batas wilayah di atas satelit
+
+// ---- Base map satelit ----
+// Peta data memakai citra Esri World Imagery (tanpa token), sama dengan peta PDRB.
+// Mapbox hanya dipakai di globe.
+const TILE_SIZE = 256;
+const SEA = "#16384a"; // warna latar di balik ubin (mendekati warna laut Esri)
+
+const tileUrl = ([x, y, z]) =>
+  `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+
+const ATTRIBUTION = "Tiles © Esri — Maxar, Earthstar Geographics, dan kontributor GIS";
 
 // geo: GeoJSON FeatureCollection
 // getValue(feature, index) -> angka | getName(feature) -> string
-// Hover (diam 0,3 detik) atau klik pada wilayah -> zoom ke wilayah itu.
-// Kursor keluar dari peta -> zoom kembali ke seluruh Indonesia.
+// Hover (diam 0,3 detik) -> zoom sementara; kursor keluar dari peta -> kembali ke seluruh Indonesia.
 // getNote(feature) -> string HTML interpretasi (opsional), ditampilkan di tooltip saat hover
-export default function Choropleth({ geo, getValue, getName, getNote, label = "Nilai" }) {
+// onFocusChange(true|false) -> dipanggil saat peta masuk/keluar dari zoom ke satu wilayah
+// target: null | { ids: [mhid...], kab: mhid | null }
+//   Dari kotak pencarian/context. Peta zoom ke provinsi (atau kab/kota bila `kab` ada),
+//   wilayah lain diredupkan. Selama target ada, zoom otomatis saat hover dimatikan.
+// onPick(feature) -> dipanggil saat wilayah diklik (memilih/mengunci wilayah). Bila tidak ada,
+//   klik hanya zoom ke wilayah itu seperti sebelumnya.
+// Komponen ini mengisi penuh elemen induknya (position: absolute; inset: 0).
+export default function Choropleth({
+  geo,
+  getValue,
+  getName,
+  getNote,
+  onFocusChange,
+  target = null,
+  onPick,
+  label = "Nilai",
+}) {
   const [wrapRef, width, boxH] = useSize();
   const svgRef = useRef(null);
+  const focusCb = useRef(onFocusChange);
+  focusCb.current = onFocusChange;
+  const targetRef = useRef(target);
+  targetRef.current = target;
+  const pickRef = useRef(onPick);
+  pickRef.current = onPick;
+  const apiRef = useRef(null);
 
   useEffect(() => {
     if (!geo || !width) return;
@@ -25,11 +65,57 @@ export default function Choropleth({ geo, getValue, getName, getNote, label = "N
     svg.interrupt();
     svg.selectAll("*").remove();
 
-    const projection = d3.geoMercator().fitSize([width, height], geo);
+    const projection = d3.geoMercator().fitExtent(
+      [[EDGE, EDGE], [width - EDGE, height - EDGE]],
+      geo
+    );
     const path = d3.geoPath(projection);
     const values = geo.features.map(getValue);
     const color = sequential(d3.extent(values));
     const tip = getTooltip();
+
+    // ---- lapisan ubin satelit (di bawah polygon) ----
+    // gBase: ubin resolusi rendah, ikut transformasi zoom (selalu ada, mencegah area kosong)
+    // gDetail: ubin resolusi menyesuaikan zoom, digambar ulang di koordinat layar
+    const [px, py] = projection.translate();
+    const s0 = projection.scale();
+    const tiler = d3Tile().tileSize(TILE_SIZE).size([width, height]);
+
+    const gBase = svg.append("g").style("pointer-events", "none");
+    const gDetail = svg.append("g").style("pointer-events", "none");
+
+    const keyOf = (t) => `${t[2]}/${t[0]}/${t[1]}`;
+
+    const baseTiles = tiler.scale(s0 * 2 * Math.PI).translate([px, py])();
+    gBase
+      .selectAll("image")
+      .data(baseTiles, keyOf)
+      .join("image")
+      .attr("href", tileUrl)
+      .attr("preserveAspectRatio", "none")
+      .attr("x", (t) => (t[0] + baseTiles.translate[0]) * baseTiles.scale)
+      .attr("y", (t) => (t[1] + baseTiles.translate[1]) * baseTiles.scale)
+      .attr("width", baseTiles.scale + 0.5)
+      .attr("height", baseTiles.scale + 0.5);
+
+    const drawDetail = (v) => {
+      const ts = tiler
+        .scale(s0 * v.k * 2 * Math.PI)
+        .translate([v.tx + v.k * px, v.ty + v.k * py])();
+      gDetail
+        .selectAll("image")
+        .data(ts, keyOf)
+        .join((enter) =>
+          enter
+            .append("image")
+            .attr("href", tileUrl)
+            .attr("preserveAspectRatio", "none")
+        )
+        .attr("x", (t) => (t[0] + ts.translate[0]) * ts.scale)
+        .attr("y", (t) => (t[1] + ts.translate[1]) * ts.scale)
+        .attr("width", ts.scale + 0.5)
+        .attr("height", ts.scale + 0.5);
+    };
 
     const g = svg.append("g");
     const polys = g.selectAll("path")
@@ -37,19 +123,20 @@ export default function Choropleth({ geo, getValue, getName, getNote, label = "N
       .join("path")
       .attr("d", path)
       .attr("fill", (d, i) => color(values[i]))
-      .attr("stroke", "#fff")
+      .attr("fill-opacity", FILL)
+      .attr("stroke", STROKE)
       .attr("stroke-width", 0.5)
       .attr("vector-effect", "non-scaling-stroke") // garis tetap tipis saat zoom
       .style("cursor", "zoom-in");
 
-    // ---- legenda (koordinat layar, tidak ikut zoom) ----
+    // ---- legenda (koordinat layar, tidak ikut zoom) di kanan bawah ----
     const drawLegend = () => {
       const ext = d3.extent(values);
       if (ext[0] == null || ext[0] === ext[1]) return;
-      const lw = Math.max(120, Math.min(220, width * 0.22));
+      const lw = Math.max(120, Math.min(220, width * 0.2));
       const lh = 10;
-      const x = 16;
-      const y = height - 40;
+      const x = width - lw - EDGE - 12;
+      const y = height - 56;
       const gid = "legend-grad-" + Math.random().toString(36).slice(2, 8);
 
       const leg = svg.append("g").style("pointer-events", "none");
@@ -70,7 +157,7 @@ export default function Choropleth({ geo, getValue, getName, getNote, label = "N
       leg.insert("rect", "text")
         .attr("x", x - 8).attr("y", y - 24)
         .attr("width", panelW).attr("height", 62)
-        .attr("rx", 6).attr("fill", "rgba(255,255,255,0.88)");
+        .attr("rx", 6).attr("fill", "rgba(255,255,255,0.9)");
 
       leg.append("rect")
         .attr("x", x).attr("y", y)
@@ -89,9 +176,26 @@ export default function Choropleth({ geo, getValue, getName, getNote, label = "N
     };
     drawLegend();
 
+    // atribusi sumber citra satelit
+    svg.append("text")
+      .attr("x", width - 8)
+      .attr("y", height - 8)
+      .attr("text-anchor", "end")
+      .attr("font-size", 10)
+      .attr("fill", "#fff")
+      .attr("stroke", "rgba(0,0,0,0.6)")
+      .attr("stroke-width", 2.5)
+      .attr("paint-order", "stroke")
+      .style("pointer-events", "none")
+      .text(ATTRIBUTION);
+
     // ---- zoom ----
     let view = { k: 1, tx: 0, ty: 0 };
-    let active = null;
+    let marked = new Set();   // wilayah yang diberi garis tebal
+    let dim = null;           // Set mhid provinsi terpilih; wilayah lain diredupkan
+    let focusId = null;       // mhid kab/kota terpilih (tetangganya ikut diredupkan)
+    let external = false;     // true saat zoom berasal dari pilihan (pencarian/klik), bukan hover
+    let syncedTarget = null;
     let animating = false;
     let lockUntil = 0;
     let dwellTimer = null;
@@ -99,14 +203,28 @@ export default function Choropleth({ geo, getValue, getName, getNote, label = "N
 
     const apply = (v) => {
       view = v;
-      g.attr("transform", `translate(${v.tx},${v.ty}) scale(${v.k})`);
+      const tf = `translate(${v.tx},${v.ty}) scale(${v.k})`;
+      g.attr("transform", tf);
+      gBase.attr("transform", tf);
+      drawDetail(v);
+    };
+
+    const opacityOf = (d) => {
+      if (!dim) return FILL;
+      const id = d.properties.mhid;
+      if (!dim.has(id)) return DIM;
+      return focusId && id !== focusId ? DIM_SIBLING : FILL;
     };
 
     const highlight = () => {
       polys
-        .attr("stroke", (d) => (d === active ? "#222" : "#fff"))
-        .attr("stroke-width", (d) => (d === active ? 2 : 0.5));
-      if (active) polys.filter((d) => d === active).raise();
+        .attr("stroke", (d) => (marked.has(d) ? ACCENT : STROKE))
+        .attr("stroke-width", (d) => (marked.has(d) ? 3 : 0.5))
+        .attr("fill-opacity", opacityOf)
+        .style("filter", (d) =>
+          marked.has(d) ? "drop-shadow(0 0 8px rgba(249,115,22,0.9))" : null
+        );
+      if (marked.size) polys.filter((d) => marked.has(d)).raise();
     };
 
     const animateTo = (to) => {
@@ -130,23 +248,79 @@ export default function Choropleth({ geo, getValue, getName, getNote, label = "N
         });
     };
 
-    const zoomToFeature = (d) => {
-      if (animating || (active === d && view.k > 1)) return;
-      const [[x0, y0], [x1, y1]] = path.bounds(d);
+    const goTo = (to, instant) => {
+      if (!instant) return animateTo(to);
+      svg.interrupt();
+      apply(to);
+      animating = false;
+    };
+
+    // view yang memuat semua wilayah di `fs`
+    const viewFor = (fs) => {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const f of fs) {
+        const [[a, b], [c, e]] = path.bounds(f);
+        if (a < x0) x0 = a;
+        if (b < y0) y0 = b;
+        if (c > x1) x1 = c;
+        if (e > y1) y1 = e;
+      }
       const bw = Math.max(x1 - x0, 1e-6);
       const bh = Math.max(y1 - y0, 1e-6);
       const k = Math.max(1, Math.min(MAX_ZOOM, FIT / Math.max(bw / width, bh / height)));
       const cx = (x0 + x1) / 2;
       const cy = (y0 + y1) / 2;
-      active = d;
+      return { k, tx: width / 2 - k * cx, ty: height / 2 - k * cy };
+    };
+
+    const zoomToFeature = (d) => {
+      if (animating || (marked.has(d) && marked.size === 1 && view.k > 1)) return;
+      marked = new Set([d]);
       highlight();
-      animateTo({ k, tx: width / 2 - k * cx, ty: height / 2 - k * cy });
+      focusCb.current?.(true);
+      animateTo(viewFor([d]));
     };
 
     const resetZoom = () => {
-      active = null;
+      if (external) return; // pilihan dari pencarian/klik dipertahankan sampai di-Reset
+      marked = new Set();
       highlight();
+      focusCb.current?.(false);
       if (view.k > 1.001 || animating) animateTo({ k: 1, tx: 0, ty: 0 });
+    };
+
+    // Menyamakan peta dengan `target` dari luar (pencarian, klik, atau chart lain)
+    const sync = (instant) => {
+      const t = targetRef.current ?? null;
+      if (t === syncedTarget) return;
+      syncedTarget = t;
+      clearTimeout(dwellTimer);
+      clearTimeout(resetTimer);
+
+      if (!t || !t.ids?.length) {
+        if (!external) return;
+        external = false;
+        marked = new Set();
+        dim = null;
+        focusId = null;
+        highlight();
+        focusCb.current?.(false);
+        if (view.k > 1.001 || animating) goTo({ k: 1, tx: 0, ty: 0 }, instant);
+        return;
+      }
+
+      const ids = new Set(t.ids);
+      const inProv = geo.features.filter((f) => ids.has(f.properties.mhid));
+      if (!inProv.length) return;
+      const kabF = t.kab ? inProv.find((f) => f.properties.mhid === t.kab) : null;
+
+      external = true;
+      dim = ids;
+      focusId = kabF ? kabF.properties.mhid : null;
+      marked = new Set(kabF ? [kabF] : []);
+      highlight();
+      focusCb.current?.(true);
+      goTo(viewFor(kabF ? [kabF] : inProv), instant);
     };
 
     const html = (d) => {
@@ -162,7 +336,7 @@ export default function Choropleth({ geo, getValue, getName, getNote, label = "N
     polys
       .on("mouseenter", (e, d) => {
         clearTimeout(resetTimer);
-        if (animating || performance.now() < lockUntil) return;
+        if (external || animating || performance.now() < lockUntil) return;
         clearTimeout(dwellTimer);
         dwellTimer = setTimeout(() => zoomToFeature(d), DWELL_MS);
       })
@@ -175,7 +349,8 @@ export default function Choropleth({ geo, getValue, getName, getNote, label = "N
       })
       .on("click", (e, d) => {
         clearTimeout(dwellTimer);
-        zoomToFeature(d); // untuk layar sentuh
+        if (pickRef.current) pickRef.current(d); // pilih/kunci wilayah -> target berubah -> sync()
+        else zoomToFeature(d);                   // layar sentuh tanpa pilihan
       });
 
     svg
@@ -186,17 +361,37 @@ export default function Choropleth({ geo, getValue, getName, getNote, label = "N
         resetTimer = setTimeout(resetZoom, RESET_MS);
       });
 
+    apply(view); // gambar ubin awal
+    apiRef.current = { sync: () => sync(false) };
+    sync(true); // peta dibangun ulang (mis. resize): langsung ke pilihan terakhir tanpa animasi
+
     return () => {
+      apiRef.current = null;
       clearTimeout(dwellTimer);
       clearTimeout(resetTimer);
       svg.interrupt();
       svg.on("mouseenter", null).on("mouseleave", null);
+      focusCb.current?.(false);
     };
-  }, [geo, width, getValue, getName, getNote, label]);
+  }, [geo, width, boxH, getValue, getName, getNote, label]);
+
+  // Pilihan berubah (tanpa membangun ulang peta)
+  useEffect(() => {
+    apiRef.current?.sync();
+  }, [target]);
 
   return (
-    <div ref={wrapRef}>
-      <svg ref={svgRef} style={{ display: "block", overflow: "hidden" }} />
+    <div ref={wrapRef} style={{ position: "absolute", inset: 0 }}>
+      <svg
+        ref={svgRef}
+        style={{
+          display: "block",
+          width: "100%",
+          height: "100%",
+          overflow: "hidden",
+          background: SEA,
+        }}
+      />
     </div>
   );
 }

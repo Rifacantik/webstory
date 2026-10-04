@@ -1,61 +1,73 @@
-import { useEffect, useState } from "react";
-import StorySection from "../layout/StorySection";
+import { useMemo, useState } from "react";
 import PCAPlot from "../charts/PCAPlot";
 import PCAInterpretation from "./PCAInterpretation";
 import { runPCA } from "../../utils/pca";
 import { getIsland } from "../../utils/regions";
-
-const FEATURES = [
-  "IPM",
-  "PDRB",
-  "Kemiskinan",
-  "TPT",
-  "TPAK",
-  "Kepadatan Penduduk",
-  "Laju Pertumbuhan Penduduk",
-  "Pengeluaran per Kapita",
-];
+import { useClusterResult, FEATURES } from "../../hooks/useClusterResult";
+import "../../styles/pca-scrolly.css";
 
 export default function PCASection() {
-  const [pcaResult, setPcaResult] = useState({ points: [], variance: [] });
+  // Data dan klaster berasal dari satu sumber yang sama dengan dendrogram dan circle packing
+  const { rows, cut } = useClusterResult();
+  // wilayah yang disorot di grafik, ditentukan oleh kartu yang sedang aktif
+  const [focus, setFocus] = useState(null);
 
-  useEffect(() => {
-    fetch("/data/pca_complete.json")
-      .then((res) => res.json())
-      .then((rows) => {
-        const result = runPCA(rows, FEATURES);
-        setPcaResult({
-          ...result,
-          points: result.points.map((p) => ({
-            ...p,
-            name: p.Provinsi,
-            group: getIsland(p.Provinsi),
-          })),
-        });
-      })
-      .catch((err) => console.error("Gagal membaca data PCA:", err));
-  }, []);
+  const pcaResult = useMemo(() => {
+    if (!rows.length) return { points: [], variance: [] };
+    const result = runPCA(rows, FEATURES);
+    return {
+      ...result,
+      points: result.points.map((p) => {
+        const c = cut?.clusterOfName.get(p.Provinsi);
+        return {
+          ...p,
+          name: p.Provinsi,
+          group: getIsland(p.Provinsi),
+          // nomor klaster 1..k, urutannya sama dengan dendrogram (1 = terkecil)
+          cluster: c != null ? c + 1 : undefined,
+        };
+      }),
+    };
+  }, [rows, cut]);
 
   return (
-    <StorySection
-      id="pca"
-      title="Bagaimana Karakteristik Provinsi Indonesia Jika Dilihat dari Berbagai Indikator?"
-      text={
-        <>
-          <p>
-            PCA digunakan untuk melihat kemiripan dan perbedaan karakteristik
-            provinsi berdasarkan berbagai indikator sosial-ekonomi secara
-            simultan. Provinsi yang posisinya berdekatan pada grafik memiliki
-            karakteristik yang relatif mirip berdasarkan indikator yang
-            digunakan.
-          </p>
-          <PCAInterpretation variance={pcaResult.variance} />
-        </>
-      }
-    >
-      {pcaResult.points.length > 0 && (
-        <PCAPlot points={pcaResult.points} variance={pcaResult.variance} />
-      )}
-    </StorySection>
+    <section id="pca" className="pca-section">
+      <header className="pca-section__head">
+        <h2>
+          Bagaimana Karakteristik Provinsi Indonesia Jika Dilihat dari
+          Berbagai Indikator?
+        </h2>
+        <p>
+          PCA digunakan untuk melihat kemiripan dan perbedaan karakteristik
+          provinsi berdasarkan berbagai indikator sosial-ekonomi secara
+          simultan. Provinsi yang posisinya berdekatan pada grafik memiliki
+          karakteristik yang relatif mirip berdasarkan indikator yang
+          digunakan.
+        </p>
+      </header>
+
+      <div className="pca-scrolly">
+        <div className="pca-scrolly__chart">
+          <div className="pca-card pca-chart-card">
+            {pcaResult.points.length > 0 ? (
+              <PCAPlot
+                points={pcaResult.points}
+                variance={pcaResult.variance}
+                focus={focus}
+              />
+            ) : (
+              <div className="pca-chart-placeholder">Memuat grafik…</div>
+            )}
+          </div>
+        </div>
+
+        <div className="pca-scrolly__steps">
+          <PCAInterpretation
+            variance={pcaResult.variance}
+            onFocusChange={setFocus}
+          />
+        </div>
+      </div>
+    </section>
   );
 }

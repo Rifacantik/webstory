@@ -1,22 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import StorySection from "../layout/StorySection";
 import Dendrogram, { CLUSTER_COLORS } from "../charts/Dendrogram";
-import { hclust, cutTree } from "../../utils/hclust";
-import { getIsland } from "../../utils/regions";
+import { getLeaves } from "../../utils/hclust";
+import { useSelection } from "../../context/SelectionContext";
+import { useClusterResult, N_CLUSTERS, METHOD } from "../../hooks/useClusterResult";
 
-const FEATURES = [
-  "IPM",
-  "PDRB",
-  "Kemiskinan",
-  "TPT",
-  "TPAK",
-  "Kepadatan Penduduk",
-  "Laju Pertumbuhan Penduduk",
-  "Pengeluaran per Kapita",
-];
-
-const N_CLUSTERS = 3;
-const METHOD = "ward"; // ganti bila hasil analisismu memakai linkage lain
 const METHOD_LABEL = { ward: "Ward", complete: "Complete", average: "Average", single: "Single" }[METHOD];
 
 const FLOW = ["Dendrogram", "Garis potong", `${N_CLUSTERS} klaster`, "Insight"];
@@ -27,65 +15,78 @@ const CAPTIONS = {
 };
 
 const fmt = (v) => v.toFixed(1).replace(".", ",");
+const leafName = (l) => (l && typeof l === "object" ? l.name ?? l.row?.Provinsi : l);
+
+// Penggabungan pertama sebuah provinsi: tinggi (jarak) dan pasangannya
+function mergeInfo(root, name) {
+  let found = null;
+  (function walk(n) {
+    if (found || !n.children) return;
+    const [a, b] = n.children;
+    const aLeaf = !a.children && leafName(a) === name;
+    const bLeaf = !b.children && leafName(b) === name;
+    if (aLeaf || bLeaf) {
+      found = { height: n.height, sibling: aLeaf ? b : a };
+      return;
+    }
+    walk(a);
+    walk(b);
+  })(root);
+  return found;
+}
+
+function describeSibling(sib) {
+  if (!sib.children) return leafName(sib);
+  const names = getLeaves(sib).map(leafName);
+  const shown = names.slice(0, 3).join(", ");
+  return `kelompok ${sib.size} provinsi (${shown}${names.length > 3 ? ", …" : ""})`;
+}
 
 export default function DendrogramSection() {
-  const [rows, setRows] = useState([]);
+  const { tree, cut } = useClusterResult();
   const [stage, setStage] = useState(1); // 1 -> 2 -> 3, berjalan otomatis
   const [hovered, setHovered] = useState(null);
   const [replayKey, setReplayKey] = useState(0);
+  const { selected } = useSelection();
 
-  useEffect(() => {
-    fetch("/data/pca_complete.json")
-      .then((res) => res.json())
-      .then((data) =>
-        setRows(data.map((r) => ({ ...r, group: getIsland(r.Provinsi) })))
-      )
-      .catch((err) => console.error("Gagal membaca data clustering:", err));
-  }, []);
-
-  const tree = useMemo(
-    () => (rows.length ? hclust(rows, FEATURES, { method: METHOD }) : null),
-    [rows]
-  );
-
-  // Urutkan klaster dari yang terkecil: Klaster 1 (biru) -> 2 (oranye) -> 3 (hijau)
-  const cut = useMemo(() => {
+  // Jarak penggabungan pertama semua provinsi: dipakai untuk menilai "khas" atau "umum"
+  const mergeStats = useMemo(() => {
     if (!tree) return null;
-    const raw = cutTree(tree, N_CLUSTERS);
-    const idOf = (l) => (l && typeof l === "object" ? l.id : l);
-    const nameOf = (l) => (l && typeof l === "object" ? l.name ?? l.row?.Provinsi : l);
-    const rowOf = (l) => (l && typeof l === "object" ? l.row : null);
-    const sorted = [...raw.clusters].sort((a, b) => a.leaves.length - b.leaves.length);
-    const assign = new Map();
-    sorted.forEach((c, i) => c.leaves.forEach((l) => assign.set(idOf(l), i)));
-
-    // statistik seluruh provinsi untuk membandingkan tiap klaster
-    const stat = {};
-    FEATURES.forEach((f) => {
-      const v = rows.map((r) => Number(r[f])).filter(Number.isFinite);
-      const mean = v.reduce((s, x) => s + x, 0) / (v.length || 1);
-      const sd = Math.sqrt(v.reduce((s, x) => s + (x - mean) ** 2, 0) / (v.length || 1)) || 1;
-      stat[f] = { mean, sd };
-    });
-
-    const clusters = sorted.map((c) => {
-      const members = c.leaves.map(rowOf).filter(Boolean);
-      const traits = FEATURES.map((f) => {
-        const v = members.map((r) => Number(r[f])).filter(Number.isFinite);
-        if (!v.length) return null;
-        const mean = v.reduce((s, x) => s + x, 0) / v.length;
-        return { f, z: (mean - stat[f].mean) / stat[f].sd };
-      })
-        .filter(Boolean)
-        .sort((a, b) => Math.abs(b.z) - Math.abs(a.z))
-        .slice(0, 3);
-      return { size: c.leaves.length, names: c.leaves.map(nameOf), traits };
-    });
-    return { assign, clusters };
-  }, [tree, rows]);
+    const heights = getLeaves(tree)
+      .map((l) => mergeInfo(tree, leafName(l))?.height)
+      .filter(Number.isFinite)
+      .sort((a, b) => a - b);
+    if (!heights.length) return null;
+    const q = (p) => heights[Math.floor(p * (heights.length - 1))];
+    return { q25: q(0.25), q75: q(0.75) };
+  }, [tree]);
 
   const total = cut ? cut.clusters.reduce((s, c) => s + c.size, 0) : 0;
   const active = hovered != null && cut ? cut.clusters[hovered] : null;
+
+  // Insight untuk provinsi yang dipilih lewat kotak "Cari provinsi"
+  const prov = useMemo(() => {
+    if (!selected || !tree || !cut) return null;
+    const mi = mergeInfo(tree, selected);
+    if (!mi) return null;
+    const ci = cut.clusterOfName.get(selected);
+    let standing = "";
+    if (mergeStats) {
+      if (mi.height >= mergeStats.q75) {
+        standing = "Profilnya relatif khas: baru bergabung dengan provinsi lain pada jarak yang tinggi.";
+      } else if (mi.height <= mergeStats.q25) {
+        standing = "Profilnya sangat dekat dengan pasangannya: bergabung pada jarak yang rendah.";
+      }
+    }
+    return {
+      name: selected,
+      height: mi.height,
+      sibling: describeSibling(mi.sibling),
+      standing,
+      ci,
+      cluster: ci != null ? cut.clusters[ci] : null,
+    };
+  }, [selected, tree, cut, mergeStats]);
 
   const replay = () => {
     setHovered(null);
@@ -94,7 +95,34 @@ export default function DendrogramSection() {
   };
 
   // indikator alur: Dendrogram -> Garis potong -> 3 klaster -> Insight (otomatis, tidak bisa diklik)
-  const reached = (i) => (i < 3 ? stage >= i + 1 : active != null);
+  const reached = (i) => (i < 3 ? stage >= i + 1 : active != null || prov != null);
+
+  const accent = active
+    ? CLUSTER_COLORS[hovered]
+    : prov && stage >= 3 && prov.ci != null
+    ? CLUSTER_COLORS[prov.ci]
+    : "#d7dce8";
+
+  const traitList = (traits) =>
+    traits.length > 0 && (
+      <ul style={{ margin: 0, padding: 0, listStyle: "none", fontSize: "0.88rem", color: "#2b3350" }}>
+        {traits.map((t) => (
+          <li key={t.f} style={{ marginBottom: 2 }}>
+            <strong style={{ color: t.z > 0 ? "#2ca58d" : "#c0392b" }}>{t.z > 0 ? "↑" : "↓"}</strong>{" "}
+            {t.f}{" "}
+            <span style={{ color: "#7d879c" }}>
+              ({t.z > 0 ? "+" : "−"}{fmt(Math.abs(t.z))} SD)
+            </span>
+          </li>
+        ))}
+      </ul>
+    );
+
+  const sdNote = (
+    <p style={{ margin: "0.6rem 0 0", fontSize: "0.75rem", color: "#7d879c" }}>
+      SD = selisih rata-rata klaster terhadap rata-rata {total} provinsi, dalam satuan simpangan baku.
+    </p>
+  );
 
   return (
     <StorySection
@@ -176,7 +204,7 @@ export default function DendrogramSection() {
           )}
         </div>
 
-        {/* Insight: muncul otomatis saat kursor berada di klaster mana pun */}
+        {/* Insight: klaster yang di-hover didahulukan; kalau tidak ada, provinsi terpilih */}
         <aside
           style={{
             flex: "0 0 280px",
@@ -186,18 +214,12 @@ export default function DendrogramSection() {
             padding: "1rem 1.1rem",
             borderRadius: 10,
             background: "#f4f7fd",
-            borderLeft: `4px solid ${active ? CLUSTER_COLORS[hovered] : "#d7dce8"}`,
+            borderLeft: `4px solid ${accent}`,
             transition: "border-color 0.2s",
             minHeight: 140,
           }}
         >
-          {!active ? (
-            <p style={{ margin: 0, color: "#7d879c", fontSize: "0.95rem" }}>
-              {stage >= 3
-                ? "Arahkan kursor ke salah satu klaster (warna) untuk melihat insight."
-                : "Insight akan muncul setelah klaster terbentuk."}
-            </p>
-          ) : (
+          {active ? (
             <div>
               <p style={{ margin: "0 0 0.75rem", fontWeight: 600, color: "#2b3350", lineHeight: 1.45 }}>
                 Pada tingkat pemotongan ini, {total} provinsi terbagi menjadi {N_CLUSTERS} kelompok
@@ -220,23 +242,62 @@ export default function DendrogramSection() {
               <p style={{ margin: "0.4rem 0 0.6rem", fontSize: "0.9rem", color: "#2b3350" }}>
                 {active.size <= 6 ? active.names.join(", ") : "Kelompok terbesar dengan karakteristik paling umum."}
               </p>
-              {active.traits.length > 0 && (
-                <ul style={{ margin: 0, padding: 0, listStyle: "none", fontSize: "0.88rem", color: "#2b3350" }}>
-                  {active.traits.map((t) => (
-                    <li key={t.f} style={{ marginBottom: 2 }}>
-                      <strong style={{ color: t.z > 0 ? "#2ca58d" : "#c0392b" }}>{t.z > 0 ? "↑" : "↓"}</strong>{" "}
-                      {t.f}{" "}
-                      <span style={{ color: "#7d879c" }}>
-                        ({t.z > 0 ? "+" : "−"}{fmt(Math.abs(t.z))} SD)
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+              {traitList(active.traits)}
+              {sdNote}
+            </div>
+          ) : prov ? (
+            <div>
+              <div style={{ fontWeight: 700, color: "#16213a", fontSize: "1.05rem", marginBottom: "0.5rem" }}>
+                {prov.name}
+              </div>
+              <p style={{ margin: "0 0 0.5rem", fontSize: "0.92rem", color: "#2b3350", lineHeight: 1.5 }}>
+                Bergabung pertama dengan <strong>{prov.sibling}</strong> pada jarak{" "}
+                <strong>{fmt(prov.height)}</strong>.
+              </p>
+              {prov.standing && (
+                <p style={{ margin: "0 0 0.5rem", fontSize: "0.92rem", color: "#2b3350", lineHeight: 1.5 }}>
+                  {prov.standing}
+                </p>
               )}
-              <p style={{ margin: "0.6rem 0 0", fontSize: "0.75rem", color: "#7d879c" }}>
-                SD = selisih rata-rata klaster terhadap rata-rata {total} provinsi, dalam satuan simpangan baku.
+              {stage >= 3 && prov.cluster ? (
+                <>
+                  <div
+                    style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      color: CLUSTER_COLORS[prov.ci], fontWeight: 700, margin: "0.6rem 0 0.4rem",
+                    }}
+                  >
+                    <span
+                      style={{
+                        width: 10, height: 10, borderRadius: "50%",
+                        background: CLUSTER_COLORS[prov.ci], display: "inline-block",
+                      }}
+                    />
+                    Klaster {prov.ci + 1} · {prov.cluster.size} provinsi
+                  </div>
+                  {prov.cluster.size === 1 && (
+                    <p style={{ margin: "0 0 0.5rem", fontSize: "0.9rem", color: "#2b3350" }}>
+                      Berdiri sendiri sebagai satu klaster.
+                    </p>
+                  )}
+                  {traitList(prov.cluster.traits)}
+                  {sdNote}
+                </>
+              ) : (
+                <p style={{ margin: "0.5rem 0 0", fontSize: "0.85rem", color: "#7d879c" }}>
+                  Klaster provinsi ini akan terlihat setelah dendrogram dipotong.
+                </p>
+              )}
+              <p style={{ margin: "0.7rem 0 0", fontSize: "0.78rem", color: "#7d879c" }}>
+                Garis tebal pada dendrogram menunjukkan jalur penggabungannya sampai ke akar.
               </p>
             </div>
+          ) : (
+            <p style={{ margin: 0, color: "#7d879c", fontSize: "0.95rem" }}>
+              {stage >= 3
+                ? "Arahkan kursor ke salah satu klaster (warna), atau pilih provinsi di kotak “Cari provinsi”, untuk melihat insight."
+                : "Insight akan muncul setelah klaster terbentuk. Anda juga bisa memilih provinsi lebih dulu di kotak “Cari provinsi”."}
+            </p>
           )}
         </aside>
       </div>

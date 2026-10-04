@@ -1,24 +1,41 @@
-/* Layout PCA: grafik menempel di kiri, kotak interpretasi bergulir di kanan */
+/* Layout PCA: kartu bergulir di kiri, grafik menempel (sticky) di kanan */
+
+.pca-section {
+  padding: clamp(3rem, 8vw, 6rem) clamp(1.25rem, 5vw, 5rem) 0;
+  border-bottom: 1px solid var(--line);
+}
+.pca-section__head {
+  max-width: 1200px;
+  margin: 0 auto 2.5rem;
+  padding: 0 1.5rem;
+}
+
 .pca-scrolly {
-  --pca-top: 5rem;              /* jarak grafik dari atas layar; naikkan jika Header Anda menempel (sticky) */
+  --pca-top: 2rem;              /* jarak grafik dari atas layar */
   --pca-accent: #0072b2;        /* biru Okabe-Ito, aman untuk buta warna */
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 1.5rem 4rem;
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
   gap: 2rem;
   align-items: start;
 }
 
+.pca-scrolly__steps {
+  grid-column: 1;
+  grid-row: 1;
+  padding: 18vh 0 30vh;
+}
+
 .pca-scrolly__chart {
+  grid-column: 2;
+  grid-row: 1;
   position: sticky;
   top: var(--pca-top);
   align-self: start;
-}
-
-.pca-scrolly__steps {
-  padding: 4vh 0 10vh;
+  height: calc(100vh - var(--pca-top) - 2rem);
+  min-height: 500px;
 }
 
 .pca-card {
@@ -31,10 +48,12 @@
 }
 
 .pca-chart-card {
+  height: 100%;
   padding: 1rem 1.25rem 1.25rem;
 }
 
 .pca-chart-placeholder {
+  height: 100%;
   min-height: 320px;
   display: grid;
   place-items: center;
@@ -95,10 +114,19 @@
     padding: 0 1rem 3rem;
   }
   .pca-scrolly__chart {
+    grid-column: 1;
+    grid-row: 1;
     top: 0;
     z-index: 2;
+    height: auto;
+    min-height: 0;
     padding: 0.5rem 0;
     background: var(--bg, #f5f6f8);
+  }
+  .pca-scrolly__steps {
+    grid-column: 1;
+    grid-row: 2;
+    padding-top: 4vh;
   }
   .pca-step {
     margin-bottom: 24vh;

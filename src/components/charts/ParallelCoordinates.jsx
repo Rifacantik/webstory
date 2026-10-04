@@ -3,59 +3,33 @@ import * as d3 from "d3";
 import { useSize } from "../../hooks/useSize";
 import { getTooltip } from "../../hooks/useTooltip";
 import { groupColor, GROUP_COLORS } from "../../utils/colors";
+import { useSelection } from "../../context/SelectionContext";
+import { DIRECTION } from "../../utils/profileInsight";
 
-// Sumbu dengan sebaran sangat timpang (satu provinsi jauh di atas yang lain)
-// memakai skala akar kuadrat supaya garis lain tidak menumpuk di bawah.
 const SQRT_AXES = ["PDRB", "Kepadatan Penduduk"];
+const INK = "#16213a";
 
-// Label pendek supaya muat di atas sumbu
 const SHORT_LABELS = {
   "Kepadatan Penduduk": "Kepadatan",
   "Laju Pertumbuhan Penduduk": "Laju Pertumbuhan",
   "Pengeluaran per Kapita": "Pengeluaran",
 };
 
-// --- Pengaturan animasi buka/tutup ---
-const ENTER_ZONE = 0.55; // garis terbuka penuh saat bagian atas grafik sudah naik ±55% tinggi layar
-const EXIT_ZONE = 0.55;  // garis menutup penuh saat bagian bawah grafik tinggal ±55% tinggi layar
-const SMOOTH = 0.12;     // 0-1, makin kecil makin "lembut" mengikuti scroll
-
-const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
-
-// Terapkan progres (0 = tertutup, 1 = terbuka penuh) ke grafik:
-// tirai (clip) menyapu garis dari kiri ke kanan, sumbu muncul saat tirai melewatinya.
-function applyReveal(anim) {
-  const r = anim.reveal;
-  if (!r) return;
-  const xf = r.x0 + (r.x1 - r.x0) * anim.p; // posisi tepi tirai
-  r.clipRect.attr("width", Math.max(0, xf));
-  r.axes.attr("opacity", (k) => clamp((xf - r.x(k) + 12) / 24));
-}
-
 // data: [{ name, group, ...nilai tiap dimensi }]
-// getNote(d) -> string HTML interpretasi (opsional), ditampilkan di tooltip saat hover
-export default function ParallelCoordinates({ data, dimensions, getNote }) {
-  const [wrapRef, width] = useSize();
+export default function ParallelCoordinates({ data, dimensions }) {
+  const [wrapRef, width, boxH] = useSize();
   const svgRef = useRef(null);
-  const clipId = useRef("pc-clip-" + Math.random().toString(36).slice(2, 8));
-  // p = progres saat ini, target = progres yang dituju (dari posisi scroll)
-  const anim = useRef({ p: 0, target: 0, reveal: null, recompute: null });
+  const { selected, setSelected } = useSelection();
 
-  // 1) gambar grafik
   useEffect(() => {
-    if (!data?.length || !width) return;
+    if (!data?.length) return;
 
-    const height = Math.min(560, Math.max(380, width * 0.55));
-    const m = { top: 60, right: 40, bottom: 24, left: 50 };
-    const svg = d3
-      .select(svgRef.current)
-      .attr("viewBox", `0 0 ${width} ${height}`);
+    const height = Math.max(340, boxH);
+    const m = { top: 84, right: 40, bottom: 24, left: 50 };
+    const svg = d3.select(svgRef.current).attr("viewBox", `0 0 ${width} ${height}`);
     svg.selectAll("*").remove();
 
-    const x = d3
-      .scalePoint()
-      .domain(dimensions)
-      .range([m.left, width - m.right]);
+    const x = d3.scalePoint().domain(dimensions).range([m.left, width - m.right]);
 
     const y = Object.fromEntries(
       dimensions.map((k) => {
@@ -71,131 +45,93 @@ export default function ParallelCoordinates({ data, dimensions, getNote }) {
     const pathOf = (d) => line(dimensions.map((k) => [x(k), y[k](d[k])]));
     const tip = getTooltip();
 
-    // tirai: hanya bagian garis di sebelah kiri tepi tirai yang terlihat
-    const clipRect = svg
-      .append("defs")
-      .append("clipPath")
-      .attr("id", clipId.current)
-      .append("rect")
-      .attr("x", 0)
-      .attr("y", 0)
-      .attr("height", height)
-      .attr("width", 0);
-
-    // sumbu digambar dulu supaya garis berada di atasnya
-    const axes = svg
-      .append("g")
-      .selectAll("g")
-      .data(dimensions)
-      .join("g")
+    const axes = svg.append("g").selectAll("g").data(dimensions).join("g")
       .attr("transform", (k) => `translate(${x(k)},0)`);
 
     axes.each(function (k) {
       d3.select(this).call(d3.axisLeft(y[k]).ticks(5, "~s"));
     });
 
-    axes
-      .append("text")
-      .attr("y", m.top - 22)
+    axes.append("text")
+      .attr("y", m.top - 28)
       .attr("text-anchor", "middle")
-      .attr("fill", "#16213a")
+      .attr("fill", INK)
       .attr("font-weight", 600)
       .attr("font-size", width < 640 ? 10 : 13)
       .text((k) => SHORT_LABELS[k] ?? k);
 
-    // garis tiap provinsi (dipotong oleh tirai)
-    const lines = svg
-      .append("g")
-      .attr("fill", "none")
-      .attr("clip-path", `url(#${clipId.current})`)
-      .selectAll("path")
-      .data(data)
-      .join("path")
+    // petunjuk arah yang lebih baik, tepat di bawah judul sumbu
+    if (width >= 640) {
+      axes.append("text")
+        .attr("y", m.top - 12)
+        .attr("text-anchor", "middle")
+        .attr("fill", "#5d6781")
+        .attr("font-size", 10.5)
+        .text((k) =>
+          DIRECTION[k] === "up" ? "↑ lebih baik" : DIRECTION[k] === "down" ? "↓ lebih baik" : ""
+        );
+    }
+
+    const lines = svg.append("g").attr("fill", "none").selectAll("path").data(data).join("path")
       .attr("d", pathOf)
       .attr("stroke", (d) => groupColor(d.group))
-      .attr("stroke-width", 1.6)
-      .attr("stroke-opacity", 0.55)
-      .style("cursor", "pointer")
+      .style("cursor", "pointer");
+
+    // keadaan diam: kalau ada provinsi terpilih, sorot itu dan redupkan yang lain
+    const applyIdle = () => {
+      lines
+        .attr("stroke-width", (d) => (d.name === selected ? 4 : 1.8))
+        .attr("stroke-opacity", (d) => (selected ? (d.name === selected ? 1 : 0.1) : 0.55));
+      if (selected) lines.filter((d) => d.name === selected).raise();
+    };
+    applyIdle();
+
+    lines
       .on("mouseenter", function () {
         lines.attr("stroke-opacity", 0.08);
-        d3.select(this)
-          .attr("stroke-opacity", 1)
-          .attr("stroke-width", 3.5)
-          .raise();
+        d3.select(this).attr("stroke-opacity", 1).attr("stroke-width", 3.5).raise();
       })
-      .on("mousemove", (e, d) => {
-        const note = getNote ? getNote(d) : "";
-        tip.show(
-          e,
-          `<strong>${d.name}</strong><br/>${d.group}` +
-            (note
-              ? `<div style="margin-top:6px;max-width:280px;white-space:normal;line-height:1.35;font-size:12px">${note}</div>`
-              : "")
-        );
-      })
+      .on("mousemove", (e, d) => tip.show(e, `${d.name}<br/>${d.group}`))
       .on("mouseleave", () => {
-        lines.attr("stroke-opacity", 0.55).attr("stroke-width", 1.6);
+        applyIdle();
         tip.hide();
+      })
+      .on("click", (e, d) => setSelected(d.name === selected ? null : d.name));
+
+    // provinsi terpilih: titik di tiap sumbu + nama di pojok kiri atas
+    // (tidak di ujung garis, supaya tidak menimpa angka sumbu)
+    const sel = selected ? data.find((d) => d.name === selected) : null;
+    if (sel) {
+      const g = svg.append("g").style("pointer-events", "none");
+
+      dimensions.forEach((k) => {
+        g.append("circle")
+          .attr("cx", x(k))
+          .attr("cy", y[k](sel[k]))
+          .attr("r", 4.5)
+          .attr("fill", groupColor(sel.group))
+          .attr("stroke", "#fff")
+          .attr("stroke-width", 2);
       });
 
-    // tepi tirai bergerak dari sebelum sumbu pertama sampai setelah sumbu terakhir
-    anim.current.reveal = {
-      clipRect,
-      axes,
-      x,
-      x0: m.left - 14,
-      x1: width - m.right + 20,
-    };
-    applyReveal(anim.current);
-    anim.current.recompute?.(); // hitung ulang target dari posisi scroll saat ini
-  }, [data, dimensions, width, getNote]);
-
-  // 2) progres buka/tutup mengikuti posisi scroll
-  useEffect(() => {
-    const a = anim.current;
-    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    let raf = null;
-
-    const tick = () => {
-      raf = null;
-      const d = a.target - a.p;
-      if (reduce || Math.abs(d) < 0.001) {
-        a.p = a.target;
-        applyReveal(a);
-        return;
-      }
-      a.p += d * SMOOTH;
-      applyReveal(a);
-      raf = requestAnimationFrame(tick);
-    };
-    const kick = () => {
-      if (raf == null) raf = requestAnimationFrame(tick);
-    };
-
-    const recompute = () => {
-      const el = svgRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const vh = window.innerHeight;
-      // masuk dari bawah layar: terbuka kiri -> kanan
-      const pIn = clamp((vh - r.top) / (vh * ENTER_ZONE));
-      // keluar lewat atas layar: menutup kanan -> kiri
-      const pOut = clamp(r.bottom / (vh * EXIT_ZONE));
-      a.target = Math.min(pIn, pOut);
-      kick();
-    };
-    a.recompute = recompute;
-
-    recompute();
-    window.addEventListener("scroll", recompute, { passive: true });
-    window.addEventListener("resize", recompute);
-    return () => {
-      window.removeEventListener("scroll", recompute);
-      window.removeEventListener("resize", recompute);
-      if (raf != null) cancelAnimationFrame(raf);
-      a.recompute = null;
-    };
-  }, []);
+      g.append("circle")
+        .attr("cx", m.left + 5)
+        .attr("cy", 14)
+        .attr("r", 5)
+        .attr("fill", groupColor(sel.group));
+      g.append("text")
+        .attr("x", m.left + 16)
+        .attr("y", 19)
+        .attr("font-size", 14)
+        .attr("font-weight", 700)
+        .attr("fill", INK)
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 4)
+        .attr("paint-order", "stroke")
+        .attr("stroke-linejoin", "round")
+        .text(sel.name);
+    }
+  }, [data, dimensions, width, boxH, selected, setSelected]);
 
   return (
     <div ref={wrapRef}>
@@ -205,15 +141,12 @@ export default function ParallelCoordinates({ data, dimensions, getNote }) {
           display: "flex",
           flexWrap: "wrap",
           gap: "0.5rem 1.25rem",
-          marginTop: "1rem",
+          paddingTop: "0.75rem",
           fontSize: "0.95rem",
         }}
       >
         {Object.entries(GROUP_COLORS).map(([name, color]) => (
-          <span
-            key={name}
-            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
-          >
+          <span key={name} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
             <span
               style={{
                 width: 12,

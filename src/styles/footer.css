@@ -1,0 +1,35 @@
+.site-footer {
+  padding: clamp(2.5rem, 6vw, 4rem) clamp(1.25rem, 6vw, 6rem);
+  background: var(--ink);
+  color: #c4cbe0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+.site-footer__inner {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: clamp(1.5rem, 4vw, 3rem);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.site-footer h3 {
+  margin: 0 0 0.6rem;
+  color: #fff;
+  font-size: 1.05rem;
+}
+.site-footer p {
+  margin: 0 0 0.6rem;
+  max-width: 46ch;
+}
+.site-footer a {
+  color: #fff;
+  text-underline-offset: 3px;
+}
+.site-footer a:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+.site-footer__tech {
+  color: #8d97b5;
+  font-size: 0.85rem;
+}

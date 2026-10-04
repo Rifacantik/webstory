@@ -1,0 +1,24 @@
+.bridge {
+  display: grid;
+  place-items: center;
+  min-height: 42vh;
+  padding: clamp(2rem, 6vw, 4rem) clamp(1.25rem, 6vw, 6rem);
+  background: var(--ink);
+}
+.bridge__text {
+  max-width: 28ch;
+  margin: 0;
+  color: #fff;
+  font-family: var(--font-head);
+  font-weight: 500;
+  font-size: clamp(1.5rem, 3.6vw, 2.6rem);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bridge__text {
+    transform: none !important;
+  }
+}

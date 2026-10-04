@@ -1,8 +1,10 @@
-import { useCallback, useMemo } from "react";
-import StorySection from "../layout/StorySection";
+import { useCallback, useMemo, useState } from "react";
 import ProportionalSymbol from "../charts/ProportionalSymbol";
+import RegionSearch from "../layout/RegionSearch";
 import { useData } from "../../hooks/useData";
+import { useRegionSelection } from "../../hooks/useRegionSelection";
 import { buildStats, pdrbNote } from "../../utils/kabkotaStats";
+import "../../styles/map-stage.css";
 
 // File di folder public/data/
 const GEO_URL = "/data/all_kabkota_ind.geojson"; // atau all_kabkota_ind.slim.geojson (lebih ringan)
@@ -11,6 +13,11 @@ const DATA_URL = "/data/ipm_kabkota.json";
 export default function ProportionalSymbolSection() {
   const { data: geo, error: geoError, loading: geoLoading } = useData(GEO_URL, "json");
   const { data: rows, error: dataError, loading: dataLoading } = useData(DATA_URL, "json");
+  const [focused, setFocused] = useState(false);
+
+  // Pilihan provinsi/kab-kota bersama (SelectionContext) -> target zoom untuk peta
+  const { target, pickKab } = useRegionSelection(rows);
+  const handlePick = useCallback((f) => pickKab(f.properties.mhid), [pickKab]);
 
   // Join GeoJSON <-> data lewat 'mhid'
   const byId = useMemo(() => {
@@ -57,33 +64,45 @@ export default function ProportionalSymbolSection() {
   const error = geoError || dataError;
 
   return (
-    <StorySection
+    <section
       id="proportional-symbol"
-      title="PDRB per Kapita Kabupaten/Kota"
-      text={
-        <p>
-          Ukuran lingkaran menunjukkan PDRB per kapita (juta rupiah) tiap kabupaten/kota.
-          Arahkan kursor ke wilayah dan diamkan sebentar untuk zoom, lengkap dengan
-          interpretasi posisinya dibanding wilayah lain dan dibanding capaian IPM-nya.
-        </p>
-      }
+      className={`map-stage${focused ? " is-focused" : ""}`}
     >
-      {loading && <p className="note">Memuat peta...</p>}
-      {error && (
-        <div className="error-box">
-          Data belum bisa dimuat. Pastikan <code>all_kabkota_ind.geojson</code> dan{" "}
-          <code>ipm_kabkota.json</code> ada di <code>public/data/</code>.
-        </div>
-      )}
-      {sortedGeo && (
-        <ProportionalSymbol
-          geo={sortedGeo}
-          label="PDRB per kapita (juta Rp)"
-          getName={getName}
-          getValue={getValue}
-          getNote={getNote}
-        />
-      )}
-    </StorySection>
+      <div className="map-stage__map">
+        {loading && <p className="map-stage__msg note">Memuat peta...</p>}
+        {error && (
+          <div className="map-stage__msg error-box">
+            Data belum bisa dimuat. Pastikan <code>all_kabkota_ind.geojson</code> dan{" "}
+            <code>ipm_kabkota.json</code> ada di <code>public/data/</code>.
+          </div>
+        )}
+        {sortedGeo && (
+          <ProportionalSymbol
+            fill
+            geo={sortedGeo}
+            label="PDRB per kapita (juta Rp)"
+            getName={getName}
+            getValue={getValue}
+            getNote={getNote}
+            onFocusChange={setFocused}
+            target={target}
+            onPick={handlePick}
+          />
+        )}
+      </div>
+
+      {sortedGeo && <RegionSearch rows={rows} variant="floating" />}
+
+      <div className="map-card map-card--intro">
+        <h2>PDRB per Kapita Kabupaten/Kota</h2>
+        <p>
+          Ukuran lingkaran menunjukkan PDRB per kapita (juta rupiah) tiap
+          kabupaten/kota. Cari provinsi lalu kabupaten/kota lewat kotak di kiri
+          atas, klik wilayah di peta, atau arahkan kursor dan diamkan sebentar
+          untuk zoom, lengkap dengan interpretasi posisinya dibanding wilayah
+          lain dan dibanding capaian IPM-nya.
+        </p>
+      </div>
+    </section>
   );
 }

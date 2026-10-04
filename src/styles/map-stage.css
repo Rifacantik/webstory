@@ -1,0 +1,99 @@
+/* Peta layar penuh dengan kartu melayang */
+.map-stage {
+  position: relative;
+  height: 100vh;
+  min-height: 640px;
+  overflow: hidden;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.map-stage__map {
+  position: absolute;
+  inset: 0;
+}
+.map-stage__msg {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+}
+
+.map-card {
+  position: absolute;
+  z-index: 2;
+  padding: 1rem 1.25rem;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 10px 30px rgba(16, 33, 58, 0.16);
+  transition: opacity 0.4s;
+  pointer-events: none; /* kursor tetap bisa mengenai peta di bawah kartu */
+}
+.map-card h2 {
+  margin: 0 0 0.5rem;
+  font-size: clamp(1.25rem, 2.1vw, 1.7rem);
+}
+.map-card h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.05rem;
+}
+.map-card p {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+.map-card p:last-child {
+  margin-bottom: 0;
+}
+.map-card__range {
+  color: var(--muted);
+}
+
+/* Kanan atas: area Samudra Pasifik yang kosong */
+.map-card--intro {
+  top: clamp(1rem, 4vh, 2.25rem);
+  right: clamp(1rem, 3vw, 2.25rem);
+  width: min(340px, 42vw);
+}
+/* Kiri bawah: area Samudra Hindia yang kosong */
+.map-card--finding {
+  bottom: clamp(1rem, 4vh, 2.25rem);
+  left: clamp(1rem, 3vw, 2.25rem);
+  width: min(320px, 40vw);
+}
+
+/* Saat peta di-zoom ke satu wilayah, kartu memudar agar tidak menutupi */
+.map-stage.is-focused .map-card {
+  opacity: 0;
+}
+
+/* Layar sempit: kartu di atas dan bawah, peta di tengah */
+@media (max-width: 900px) {
+  .map-stage {
+    height: auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .map-card {
+    position: static;
+    width: auto;
+    margin: 1rem;
+    pointer-events: auto;
+  }
+  .map-card--intro {
+    order: 1;
+  }
+  .map-stage__map {
+    order: 2;
+    position: relative;
+    height: 70vh;
+  }
+  .map-card--finding {
+    order: 3;
+  }
+  .map-stage.is-focused .map-card {
+    opacity: 1;
+  }
+}

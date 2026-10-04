@@ -1,0 +1,106 @@
+/* Garis progres di tepi atas layar */
+.read-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  z-index: 100;
+  pointer-events: none;
+}
+.read-progress__bar {
+  height: 100%;
+  background: #2a6fdb;
+  transform-origin: left center;
+  transform: scaleX(0);
+  will-change: transform;
+}
+
+/* Titik bab di sisi kanan */
+.chapter-nav {
+  position: fixed;
+  top: 50%;
+  right: 1.1rem;
+  transform: translateY(-50%);
+  z-index: 40;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.35s, visibility 0.35s;
+}
+.chapter-nav.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+.chapter-nav ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+.chapter-nav__btn {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.3rem 0.2rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+}
+.chapter-nav__dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #16213a;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+  transition: transform 0.2s, background 0.2s;
+}
+.chapter-nav__btn.is-active .chapter-nav__dot {
+  background: #2a6fdb;
+  border-color: #2a6fdb;
+  transform: scale(1.35);
+}
+
+/* Label HANYA muncul saat hover atau fokus keyboard.
+   Bab aktif cukup ditandai titik biru, supaya label tidak menutupi konten. */
+.chapter-nav__label {
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  background: #16213a;
+  color: #fff;
+  font-family: var(--font-head);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(6px);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+.chapter-nav__btn:hover .chapter-nav__label,
+.chapter-nav__btn:focus-visible .chapter-nav__label {
+  opacity: 1;
+  transform: none;
+}
+.chapter-nav__btn:focus-visible {
+  outline: 2px solid #2a6fdb;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* Layar sempit: titik bab disembunyikan, garis progres tetap ada */
+@media (max-width: 900px) {
+  .chapter-nav {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chapter-nav,
+  .chapter-nav__label,
+  .chapter-nav__dot {
+    transition: none;
+  }
+}

@@ -1,21 +1,18 @@
+import { CLUSTER_COLORS } from "../../utils/clusters";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as d3 from "d3";
 import { useSize } from "../../hooks/useSize";
 import { getLeaves } from "../../utils/hclust";
+import { useSelection } from "../../context/SelectionContext";
+import { textWidth } from "../../utils/textFit";
 
-// Biru, oranye, hijau = Klaster 1, 2, 3
-export const CLUSTER_COLORS = [
-  "#2a6fdb",
-  "#e8743b",
-  "#2ca58d",
-  "#9b59b6",
-  "#d4a017",
-  "#c0392b",
-];
+export { CLUSTER_COLORS };
+
 const BASE = "#7d879c"; // cabang sebelum diwarnai
 const ABOVE_CUT = "#cfd5e2"; // cabang di atas garis potong
 const CUT_COLOR = "#c0392b";
 const SPARK = "#2a6fdb";
+const INK = "#16213a";
 const colorOf = (c) => (c < 0 ? ABOVE_CUT : CLUSTER_COLORS[c % CLUSTER_COLORS.length]);
 
 // Pengaturan animasi (ms)
@@ -27,6 +24,18 @@ const V_DUR = 140; // tumbuh penghubung vertikal
 const MAX_END = 6500; // batas total animasi tahap 1
 const CUT_HOLD = 2200; // lama tahap 2 (garis potong) sebelum klaster diwarnai
 
+// daftar node internal dari akar sampai induk langsung daun (urut akar -> induk), atau null
+function pathTo(node, id, acc = []) {
+  if (!node.children) return node.id === id ? acc : null;
+  for (const c of node.children) {
+    const r = pathTo(c, id, [...acc, node]);
+    if (r) return r;
+  }
+  return null;
+}
+
+const leafName = (l) => l.name ?? l.row?.Provinsi;
+
 /**
  * Alur otomatis: tahap 1 (dendrogram tumbuh) -> 2 (garis potong) -> 3 (klaster berwarna).
  * Komponen ini yang menjalankan timer dan memanggil onStageChange(n).
@@ -37,6 +46,10 @@ const CUT_HOLD = 2200; // lama tahap 2 (garis potong) sebelum klaster diwarnai
  * activeCluster        : indeks klaster yang di-hover (atau null)
  * onHoverCluster(i|null): dipanggil saat kursor masuk/keluar klaster
  * replayKey            : ubah nilainya untuk memutar ulang
+ *
+ * Provinsi terpilih (dari kotak "Cari provinsi") diambil dari SelectionContext:
+ * labelnya disorot, jalur penggabungannya ditebalkan, dan halaman digulir
+ * ke provinsi itu bila berada di luar layar.
  */
 export default function Dendrogram({
   root,
@@ -50,15 +63,35 @@ export default function Dendrogram({
   replayKey = 0,
 }) {
   const [wrapRef, width] = useSize();
+  const { selected } = useSelection();
   const outerRef = useRef(null);
   const svgRef = useRef(null);
   const playedRef = useRef(null);
   const prevStageRef = useRef(null);
+  const layoutRef = useRef(null);
+  const prevSelRef = useRef(null);
   const stageCb = useRef(onStageChange);
   const hoverCb = useRef(onHoverCluster);
   stageCb.current = onStageChange;
   hoverCb.current = onHoverCluster;
   const [inView, setInView] = useState(false);
+
+  // lebar label terpanjang (diukur setelah font siap) -> menentukan margin kanan
+  const [labelW, setLabelW] = useState(0);
+  useEffect(() => {
+    if (!root || !svgRef.current) return;
+    let off = false;
+    const measure = () => {
+      if (off || !svgRef.current) return;
+      const fam = getComputedStyle(svgRef.current).fontFamily;
+      const w = Math.max(...getLeaves(root).map((l) => textWidth(leafName(l) ?? "", `800 12px ${fam}`)));
+      setLabelW(w);
+    };
+    (document.fonts?.ready ?? Promise.resolve()).then(measure);
+    return () => {
+      off = true;
+    };
+  }, [root]);
 
   // Mulai otomatis saat dendrogram masuk layar
   useEffect(() => {
@@ -90,7 +123,7 @@ export default function Dendrogram({
   }, [assign, k]);
 
   useEffect(() => {
-    if (!root || !assign || !width) return;
+    if (!root || !assign || !width || !labelW) return;
 
     const prevStage = prevStageRef.current;
     prevStageRef.current = stage;
@@ -105,7 +138,8 @@ export default function Dendrogram({
 
     const leaves = getLeaves(root);
     const rowH = 20;
-    const m = { top: 38, right: width < 560 ? 130 : 170, bottom: 46, left: 16 };
+    // margin kanan = lebar label terpanjang + offset teks (14) + ruang sorotan kuning
+    const m = { top: 38, right: Math.ceil(labelW) + 30, bottom: 46, left: 16 };
     const plotBottom = m.top + leaves.length * rowH;
     const height = plotBottom + m.bottom;
     const showCut = stage >= 2;
@@ -141,6 +175,7 @@ export default function Dendrogram({
     const xc = x(cutH);
 
     const yPos = new Map(leaves.map((l, i) => [l.id, m.top + i * rowH + rowH / 2]));
+    const nodeY = new Map(); // posisi vertikal tiap node internal (untuk menelusuri jalur)
 
     // segmen cabang + jadwal animasi
     const segs = [];
@@ -159,10 +194,14 @@ export default function Dendrogram({
       segs.push({ d: `M${x(b.height)},${rb.y}H${xn}`, c: rb.c, delay: start, dur: H_DUR });
       segs.push({ d: `M${xn},${ra.y}V${rb.y}`, c, delay: vStart, dur: V_DUR });
       const y = (ra.y + rb.y) / 2;
+      nodeY.set(n.id, y);
       sparks.push({ x: xn, y, t: fin });
       return { y, c, fin };
     }
     const rootRes = walk(root);
+
+    // simpan tata letak untuk sorotan provinsi terpilih (efek terpisah di bawah)
+    layoutRef.current = { x, yPos, nodeY, leaves, height, rowH, animate };
 
     const scale = rootRes.fin > MAX_END ? (MAX_END - T0) / (rootRes.fin - T0) : 1;
     const sc = (t) => T0 + (t - T0) * scale;
@@ -299,6 +338,7 @@ export default function Dendrogram({
       .data(leaves)
       .join("g")
       .attr("class", "dg-el")
+      .attr("data-name", (l) => leafName(l))
       .attr("data-c", (l) => assign.get(l.id))
       .attr("transform", (l) => `translate(${x(0)},${yPos.get(l.id)})`)
       .style("pointer-events", "none");
@@ -328,7 +368,7 @@ export default function Dendrogram({
       .attr("font-size", 12)
       .attr("font-weight", showColor ? 600 : 400)
       .attr("fill", (l) => (showColor && !fromCut ? colorOf(assign.get(l.id)) : "#2b3350"))
-      .text((l) => l.name);
+      .text((l) => leafName(l));
     if (fromCut) {
       labels.transition().duration(900).attr("fill", (l) => colorOf(assign.get(l.id)));
     }
@@ -383,7 +423,7 @@ export default function Dendrogram({
       timer = setTimeout(() => stageCb.current?.(3), CUT_HOLD);
     }
     return () => clearTimeout(timer);
-  }, [root, assign, k, stage, methodLabel, width, inView, replayKey]);
+  }, [root, assign, k, stage, methodLabel, width, inView, replayKey, labelW]);
 
   // sorot klaster yang di-hover, redupkan yang lain
   useEffect(() => {
@@ -401,7 +441,127 @@ export default function Dendrogram({
       .attr("fill-opacity", function () {
         return +this.getAttribute("data-c") === activeCluster ? 0.1 : 0;
       });
-  }, [activeCluster, stage, width, inView, root, assign, replayKey]);
+  }, [activeCluster, stage, width, inView, root, assign, replayKey, labelW]);
+
+  // sorot provinsi pilihan: label diberi latar kuning, jalur penggabungannya
+  // (dari daun sampai akar) ditebalkan dan digambar bertahap
+  useEffect(() => {
+    const svg = d3.select(svgRef.current);
+    svg.selectAll(".dg-sel").remove();
+    svg.selectAll("g.dg-el text").attr("font-weight", stage >= 3 ? 600 : 400);
+
+    const L = layoutRef.current;
+    if (!selected || !L || !root) {
+      prevSelRef.current = selected;
+      return;
+    }
+    // tunggu dendrogram selesai tumbuh supaya jalur tidak muncul mendahului cabangnya
+    if (stage === 1 && L.animate) return;
+
+    const leaf = L.leaves.find((l) => leafName(l) === selected);
+    const chain = leaf ? pathTo(root, leaf.id) : null;
+    if (!leaf || !chain) {
+      prevSelRef.current = selected;
+      return;
+    }
+
+    const changed = prevSelRef.current !== selected;
+    prevSelRef.current = selected;
+
+    const { x, yPos, nodeY, rowH } = L;
+    const yLeaf = yPos.get(leaf.id);
+    const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+    // 1) latar kuning di belakang label
+    const leafGroup = svg.selectAll("g.dg-el").filter(function () {
+      return this.getAttribute("data-name") === selected;
+    });
+    const textNode = leafGroup.select("text");
+    textNode.attr("font-weight", 800);
+    let tw = 0;
+    try {
+      tw = textNode.node()?.getComputedTextLength?.() ?? 0;
+    } catch {
+      tw = 0;
+    }
+    if (!tw) tw = selected.length * 7.2;
+    const below = svg.insert("g", ":first-child").attr("class", "dg-sel").style("pointer-events", "none");
+    below.append("rect")
+      .attr("x", x(0) + 9)
+      .attr("y", yLeaf - rowH / 2 + 1)
+      .attr("width", tw + 12)
+      .attr("height", rowH - 2)
+      .attr("rx", 4)
+      .attr("fill", "#ffe066")
+      .attr("fill-opacity", 0.75);
+
+    // 2) jalur dari daun ke akar
+    const above = svg.append("g").attr("class", "dg-sel").style("pointer-events", "none");
+    const up = [...chain].reverse(); // dari induk langsung sampai akar
+    const d =
+      `M${x(0)},${yLeaf}` +
+      up.map((n) => `H${x(n.height)}V${nodeY.get(n.id)}`).join("");
+    const p = above.append("path")
+      .attr("d", d)
+      .attr("fill", "none")
+      .attr("stroke", INK)
+      .attr("stroke-width", 3.4)
+      .attr("stroke-linecap", "round")
+      .attr("stroke-linejoin", "round");
+    if (changed && !reduced) {
+      const len = p.node().getTotalLength();
+      p.attr("stroke-dasharray", `${len} ${len}`)
+        .attr("stroke-dashoffset", len)
+        .transition()
+        .duration(900)
+        .ease(d3.easeCubicOut)
+        .attr("stroke-dashoffset", 0)
+        .on("end", () => p.attr("stroke-dasharray", null).attr("stroke-dashoffset", null));
+    }
+
+    up.forEach((n) => {
+      above.append("circle")
+        .attr("cx", x(n.height))
+        .attr("cy", nodeY.get(n.id))
+        .attr("r", 3.6)
+        .attr("fill", "#fff")
+        .attr("stroke", INK)
+        .attr("stroke-width", 2);
+    });
+
+    // jarak penggabungan pertama, di sebelah kiri titiknya
+    const first = up[0];
+    above.append("text")
+      .attr("x", x(first.height) - 7)
+      .attr("y", nodeY.get(first.id) - 6)
+      .attr("text-anchor", "end")
+      .attr("font-size", 11)
+      .attr("font-weight", 700)
+      .attr("fill", INK)
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 3.5)
+      .attr("paint-order", "stroke")
+      .attr("stroke-linejoin", "round")
+      .text(`jarak ${d3.format(".1f")(first.height)}`);
+  }, [selected, stage, width, inView, root, assign, replayKey, labelW]);
+
+  // gulir halaman ke provinsi terpilih bila labelnya di luar layar
+  // (hanya saat pembaca memang sedang berada di bagian dendrogram)
+  useEffect(() => {
+    const L = layoutRef.current;
+    const svgEl = svgRef.current;
+    if (!selected || !L || !svgEl || !root) return;
+    const leaf = L.leaves.find((l) => leafName(l) === selected);
+    if (!leaf) return;
+    const r = svgEl.getBoundingClientRect();
+    const vh = window.innerHeight;
+    if (!(r.top < vh * 0.5 && r.bottom > vh * 0.5)) return;
+    const y = r.top + L.yPos.get(leaf.id) * (r.height / L.height);
+    if (y < 140 || y > vh - 140) {
+      const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      window.scrollBy({ top: y - vh / 2, behavior: reduced ? "auto" : "smooth" });
+    }
+  }, [selected, root]);
 
   return (
     <div ref={outerRef} style={{ minHeight: 320 }}>
