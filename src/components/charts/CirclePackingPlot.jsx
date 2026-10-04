@@ -15,12 +15,44 @@ export const CLUSTER_PALETTE = {
 
 const TEXT = "#10213a";
 const ZOOM = 1.2;
+const MOBILE_BP = 520;
 
 const fmt = (v) =>
   v.toLocaleString("id-ID", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+// Khusus HP: paksa container induk tidak mengunci tinggi / menyusutkan chart,
+// sehingga "Sumber data" selalu berada di bawah chart (tidak tumpang tindih).
+const MOBILE_FIX_CSS = `
+@media (max-width: ${MOBILE_BP + 80}px) {
+  .chart-wrap:has(.cp-root) {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-start !important;
+  }
+  .chart-wrap:has(.cp-root) > .cp-root {
+    flex: none !important;
+    width: 100% !important;
+    height: auto !important;
+    margin-bottom: 2rem !important;
+  }
+  .chart-wrap:has(.cp-root) > .source-note,
+  .chart-wrap:has(.cp-root) .source-note {
+    position: static !important;
+    flex: none !important;
+    margin-top: 0 !important;
+    transform: none !important;
+    clear: both;
+  }
+}
+`;
 
 function partitions(words, k) {
   if (k === 1) return [[words.join(" ")]];
@@ -50,17 +82,11 @@ function bestLayout(name, r) {
   for (let k = 1; k <= Math.min(3, words.length); k++) {
     partitions(words, k).forEach((lines) => {
       const maxW = Math.max(
-        ...lines.map(
-          (l) => textWidth(l, `600 100px ${fam}`) / 100
-        )
+        ...lines.map((l) => textWidth(l, `600 100px ${fam}`) / 100)
       );
 
       const fs =
-        (0.84 * r) /
-        Math.hypot(
-          maxW / 2,
-          (lines.length * 1.15) / 2
-        );
+        (0.84 * r) / Math.hypot(maxW / 2, (lines.length * 1.15) / 2);
 
       if (fs > best.fs) {
         best = {
@@ -73,7 +99,7 @@ function bestLayout(name, r) {
 
   return {
     lines: best.lines,
-    fs: Math.max(4.5, Math.min(13, best.fs)),
+    fs: Math.max(4.5, Math.min(15, best.fs)),
   };
 }
 
@@ -115,6 +141,7 @@ export default function CirclePackingPlot({
   clusters,
   selectedCluster,
   onClusterClick,
+  children,
 }) {
   const [wrapRef, width] = useSize();
 
@@ -122,15 +149,49 @@ export default function CirclePackingPlot({
   const svgRef = useRef(null);
   const playedRef = useRef(false);
 
+  // Simpan callback & klaster terpilih di ref supaya SVG tidak digambar
+  // ulang setiap kali klaster diklik (menghindari kedip & event hilang).
+  const onClickRef = useRef(onClusterClick);
+  const selectedRef = useRef(selectedCluster);
+  onClickRef.current = onClusterClick;
+  selectedRef.current = selectedCluster;
+
   const [inView, setInView] = useState(false);
   const [active, setActive] = useState(null);
 
   const [fontsReady, setFontsReady] = useState(false);
 
+  const isMobile = width > 0 && width < MOBILE_BP;
+
   useEffect(() => {
     (document.fonts?.ready ?? Promise.resolve()).then(() =>
       setFontsReady(true)
     );
+  }, []);
+
+  // Tooltip harus hilang saat halaman di-scroll (atau disentuh di luar
+  // grafik di HP), karena mouseleave tidak ikut terpicu saat scroll.
+  useEffect(() => {
+    const tip = getTooltip();
+    const hide = () => tip.hide();
+
+    const onPointerDown = (e) => {
+      if (!svgRef.current?.contains(e.target)) hide();
+    };
+
+    // capture: true supaya scroll di container bersarang juga tertangkap
+    window.addEventListener("scroll", hide, { passive: true, capture: true });
+    window.addEventListener("wheel", hide, { passive: true });
+    window.addEventListener("touchmove", hide, { passive: true });
+    window.addEventListener("pointerdown", onPointerDown, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", hide, { capture: true });
+      window.removeEventListener("wheel", hide);
+      window.removeEventListener("touchmove", hide);
+      window.removeEventListener("pointerdown", onPointerDown);
+      hide();
+    };
   }, []);
 
   useEffect(() => {
@@ -173,18 +234,30 @@ export default function CirclePackingPlot({
   useEffect(() => {
     if (!clusters?.length || !width || !fontsReady) return;
 
-    const size = Math.min(width, 720);
+    // Desktop: kanvas lebih tinggi supaya lingkaran lebih besar dan ruang
+    // kosong di bawah berkurang. HP/tablet kecil tetap seperti semula.
+    const size =
+      width >= 700 ? Math.min(width * 0.9, 900) : Math.min(width, 720);
 
     const padX = 24;
     const padT = 46;
-    const padB = 24;
+    // HP: ruang bawah lebih besar supaya label "Klaster 1" tidak terpotong
+    const padB = width < MOBILE_BP ? 56 : 24;
 
     const svg = d3
       .select(svgRef.current)
       .attr("viewBox", `0 0 ${width} ${size}`)
-      .attr("preserveAspectRatio", "xMidYMin meet");
+      .attr("preserveAspectRatio", "xMidYMin meet")
+      .style("overflow", "visible");
 
     svg.selectAll("*").remove();
+
+    svg.on("click", (e) => {
+      const el = e.target.closest?.("[data-c]");
+      if (!el) return;
+      const id = +el.getAttribute("data-c");
+      if (!Number.isNaN(id)) onClickRef.current?.(id);
+    });
 
     if (!inView) return;
 
@@ -192,8 +265,7 @@ export default function CirclePackingPlot({
       "(prefers-reduced-motion: reduce)"
     ).matches;
 
-    const animate =
-      !reduced && !playedRef.current;
+    const animate = !reduced && !playedRef.current;
 
     playedRef.current = true;
 
@@ -212,10 +284,7 @@ export default function CirclePackingPlot({
       grad
         .append("stop")
         .attr("offset", "0%")
-        .attr(
-          "stop-color",
-          d3.color(p.outer).brighter(0.8).formatHex()
-        );
+        .attr("stop-color", d3.color(p.outer).brighter(0.8).formatHex());
 
       grad
         .append("stop")
@@ -258,20 +327,11 @@ export default function CirclePackingPlot({
       .sum((d) => d.value || 0)
       .sort((a, b) => b.value - a.value);
 
-    d3
-      .pack()
-      .size([
-        width - 2 * padX,
-        size - padT - padB,
-      ])
+    d3.pack()
+      .size([width - 2 * padX, size - padT - padB])
       .padding((d) => (d.depth === 0 ? 14 : 3))(root);
 
-    const g = svg
-      .append("g")
-      .attr(
-        "transform",
-        `translate(${padX},${padT})`
-      );
+    const g = svg.append("g").attr("transform", `translate(${padX},${padT})`);
 
     const tip = getTooltip();
 
@@ -287,48 +347,31 @@ export default function CirclePackingPlot({
       .attr("data-c", (d) => d.data.id)
       .attr("cx", (d) => d.x)
       .attr("cy", (d) => d.y)
-      .attr("r", (d) =>
-        animate ? 0 : d.r
-      )
-      .attr(
-        "fill",
-        (d) => `url(#cp-grad-${d.data.id})`
-      )
+      .attr("r", (d) => (animate ? 0 : d.r))
+      .attr("fill", (d) => `url(#cp-grad-${d.data.id})`)
       .attr("stroke", "#fff")
       .attr("stroke-width", 2)
       .attr("filter", "url(#cp-shadow)")
       .style("cursor", "pointer")
 
-      // HOVER KLASTER
       .on("mouseenter", (_, d) => {
         setActive(d.data.id);
       })
 
-      // KLIK KLASTER
-      .on("click", (_, d) => {
-        onClusterClick?.(d.data.id);
-      })
-
       .on("mousemove", (e, d) => {
-        const vals = d.children.map(
-          (c) => c.data.ipm
-        );
+        const vals = d.children.map((c) => c.data.ipm);
 
         tip.show(
           e,
           `<strong>Klaster ${d.data.id}</strong><br/>` +
             `${vals.length} provinsi<br/>` +
-            `Rata-rata IPM: ${fmt(
-              d3.mean(vals)
-            )}<br/>` +
-            `Rentang IPM: ${fmt(
-              d3.min(vals)
-            )} – ${fmt(d3.max(vals))}`
+            `Rata-rata IPM: ${fmt(d3.mean(vals))}<br/>` +
+            `Rentang IPM: ${fmt(d3.min(vals))} – ${fmt(d3.max(vals))}`
         );
       })
 
       .on("mouseleave", () => {
-        setActive(selectedCluster);
+        setActive(selectedRef.current);
         tip.hide();
       })
 
@@ -353,92 +396,39 @@ export default function CirclePackingPlot({
       .data(root.leaves())
       .join("g")
       .attr("class", "cp-leaf")
-      .attr(
-        "data-c",
-        (d) => d.data.clusterId
-      )
-      .attr(
-        "transform",
-        (d) => `translate(${d.x},${d.y})`
-      )
+      .attr("data-c", (d) => d.data.clusterId)
+      .attr("transform", (d) => `translate(${d.x},${d.y})`)
       .style("cursor", "pointer");
 
     const zoom = leaf
       .append("g")
       .attr("class", "cp-zoom")
-      .attr(
-        "transform",
-        animate
-          ? "scale(0)"
-          : "scale(1)"
-      );
+      .attr("transform", animate ? "scale(0)" : "scale(1)");
 
     zoom
       .append("circle")
       .attr("r", (d) => d.r)
-      .attr(
-        "fill",
-        (d) =>
-          getPalette(
-            d.data.clusterId
-          ).inner
-      )
-      .attr(
-        "stroke",
-        (d) =>
-          getPalette(
-            d.data.clusterId
-          ).outer
-      )
+      .attr("fill", (d) => getPalette(d.data.clusterId).inner)
+      .attr("stroke", (d) => getPalette(d.data.clusterId).outer)
       .attr("stroke-width", 1.5);
 
     // LABEL PROVINSI
 
     zoom.each(function (d) {
-      const { lines, fs } =
-        bestLayout(
-          d.data.name,
-          d.r
-        );
+      const { lines, fs } = bestLayout(d.data.name, d.r);
 
       const lh = fs * 1.12;
 
-      const t = d3
-        .select(this)
-        .append("g")
-        .style(
-          "pointer-events",
-          "none"
-        );
+      const t = d3.select(this).append("g").style("pointer-events", "none");
 
       lines.forEach((line, i) => {
         t.append("text")
-          .attr(
-            "y",
-            (i -
-              (lines.length - 1) / 2) *
-              lh
-          )
-          .attr(
-            "text-anchor",
-            "middle"
-          )
-          .attr(
-            "dominant-baseline",
-            "central"
-          )
-          .attr(
-            "font-size",
-            fs
-          )
-          .attr(
-            "font-weight",
-            600
-          )
-          .attr(
-            "fill",
-            TEXT
-          )
+          .attr("y", (i - (lines.length - 1) / 2) * lh)
+          .attr("text-anchor", "middle")
+          .attr("dominant-baseline", "central")
+          .attr("font-size", fs)
+          .attr("font-weight", 600)
+          .attr("fill", TEXT)
           .text(line);
       });
     });
@@ -446,16 +436,10 @@ export default function CirclePackingPlot({
     if (animate) {
       zoom
         .transition("z")
-        .delay(
-          (_, i) =>
-            550 + i * 18
-        )
+        .delay((_, i) => 550 + i * 18)
         .duration(600)
         .ease(d3.easeBackOut)
-        .attr(
-          "transform",
-          "scale(1)"
-        );
+        .attr("transform", "scale(1)");
     }
 
     // ==============================
@@ -464,53 +448,31 @@ export default function CirclePackingPlot({
 
     leaf
       .on("mouseenter", function (e, d) {
-        const me = d3
-          .select(this)
-          .raise();
+        const me = d3.select(this).raise();
 
         me.select(".cp-zoom")
-          .style(
-            "filter",
-            "drop-shadow(0 4px 8px rgba(10,30,60,0.35))"
-          )
+          .style("filter", "drop-shadow(0 4px 8px rgba(10,30,60,0.35))")
           .transition("z")
           .duration(200)
-          .ease(
-            d3.easeCubicOut
-          )
-          .attr(
-            "transform",
-            `scale(${ZOOM})`
-          );
+          .ease(d3.easeCubicOut)
+          .attr("transform", `scale(${ZOOM})`);
 
         me.select("circle")
-          .attr(
-            "stroke",
-            "#111827"
-          )
-          .attr(
-            "stroke-width",
-            2.5
-          );
+          .attr("stroke", "#111827")
+          .attr("stroke-width", 2.5);
 
         svg
           .selectAll(".cp-leaf")
           .transition("h")
           .duration(180)
-          .attr(
-            "opacity",
-            (o) =>
-              o === d ? 1 : 0.3
-          );
+          .attr("opacity", (o) => (o === d ? 1 : 0.3));
       })
 
       .on("mousemove", (e, d) => {
         tip.show(
           e,
           `<strong>${d.data.name}</strong><br/>` +
-            `IPM: ${fmt(
-              d.data.ipm
-            )}<br/>` +
+            `IPM: ${fmt(d.data.ipm)}<br/>` +
             `Klaster ${d.data.clusterId}`
         );
       })
@@ -522,34 +484,18 @@ export default function CirclePackingPlot({
           .style("filter", null)
           .transition("z")
           .duration(200)
-          .ease(
-            d3.easeCubicOut
-          )
-          .attr(
-            "transform",
-            "scale(1)"
-          );
+          .ease(d3.easeCubicOut)
+          .attr("transform", "scale(1)");
 
         me.select("circle")
-          .attr(
-            "stroke",
-            getPalette(
-              d.data.clusterId
-            ).outer
-          )
-          .attr(
-            "stroke-width",
-            1.5
-          );
+          .attr("stroke", getPalette(d.data.clusterId).outer)
+          .attr("stroke-width", 1.5);
 
         svg
           .selectAll(".cp-leaf")
           .transition("h")
           .duration(180)
-          .attr(
-            "opacity",
-            1
-          );
+          .attr("opacity", 1);
 
         tip.hide();
       });
@@ -560,103 +506,45 @@ export default function CirclePackingPlot({
 
     const labels = g
       .append("g")
-      .style(
-        "pointer-events",
-        "none"
-      )
+      .style("pointer-events", "none")
       .selectAll("text")
       .data(root.children)
       .join("text")
-      .attr(
-        "class",
-        "cp-label"
-      )
-      .attr(
-        "data-c",
-        (d) => d.data.id
-      )
-      .attr(
-        "x",
-        (d) => d.x
-      )
-      .attr(
-        "y",
-        (d) => {
-          const above =
-            d.y - d.r - 10;
+      .attr("class", "cp-label")
+      .attr("data-c", (d) => d.data.id)
+      .attr("x", (d) => d.x)
+      .attr("y", (d) => {
+        const above = d.y - d.r - 10;
 
-          const clash =
-            root.children.some(
-              (o) =>
-                o !== d &&
-                Math.hypot(
-                  d.x - o.x,
-                  above -
-                    6 -
-                    o.y
-                ) <
-                  o.r + 40
-            );
+        const clash = root.children.some(
+          (o) =>
+            o !== d && Math.hypot(d.x - o.x, above - 6 - o.y) < o.r + 40
+        );
 
-          return clash
-            ? d.y + d.r + 22
-            : above;
-        }
-      )
-      .attr(
-        "text-anchor",
-        "middle"
-      )
-      .attr(
-        "font-size",
-        15
-      )
-      .attr(
-        "font-weight",
-        700
-      )
-      .attr(
-        "fill",
-        TEXT
-      )
-      .attr(
-        "stroke",
-        "#fff"
-      )
-      .attr(
-        "stroke-width",
-        3
-      )
-      .attr(
-        "paint-order",
-        "stroke"
-      )
-      .text(
-        (d) =>
-          `Klaster ${d.data.id}`
-      );
+        return clash ? d.y + d.r + 22 : above;
+      })
+      .attr("text-anchor", "middle")
+      .attr("font-size", 15)
+      .attr("font-weight", 700)
+      .attr("fill", TEXT)
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 3)
+      .attr("paint-order", "stroke")
+      .text((d) => `Klaster ${d.data.id}`);
 
     if (animate) {
       labels
-        .attr(
-          "opacity",
-          0
-        )
+        .attr("opacity", 0)
         .transition("e")
         .delay(1000)
         .duration(600)
-        .attr(
-          "opacity",
-          1
-        );
+        .attr("opacity", 1);
     }
   }, [
     clusters,
     width,
     inView,
     fontsReady,
-    onClusterClick,
-    selectedCluster,
   ]);
 
   // ==============================
@@ -664,44 +552,34 @@ export default function CirclePackingPlot({
   // ==============================
 
   useEffect(() => {
-    const current =
-      active ?? selectedCluster;
+    const current = active ?? selectedCluster;
 
     d3.select(svgRef.current)
-      .selectAll(
-        ".cp-cluster, .cp-leaf, .cp-label"
-      )
+      .selectAll(".cp-cluster, .cp-leaf, .cp-label")
       .transition("h")
       .duration(180)
-      .attr(
-        "opacity",
-        function () {
-          const c = +this.getAttribute(
-            "data-c"
-          );
+      .attr("opacity", function () {
+        const c = +this.getAttribute("data-c");
 
-          return current == null ||
-            c === current
-            ? 1
-            : 0.2;
-        }
-      );
-  }, [
-    active,
-    selectedCluster,
-    width,
-    inView,
-    clusters,
-  ]);
+        return current == null || c === current ? 1 : 0.2;
+      });
+  }, [active, selectedCluster, width, inView, clusters, fontsReady]);
 
   return (
     <div
       ref={outerRef}
+      className="cp-root"
       style={{
         minHeight: 320,
+        width: "100%",
+        flex: "none",
+        overflow: "visible",
+        paddingBottom: isMobile ? "1rem" : 0,
       }}
     >
-      <div ref={wrapRef}>
+      <style>{MOBILE_FIX_CSS}</style>
+
+      <div ref={wrapRef} style={{ width: "100%", flex: "none" }}>
         {/* ==============================
             KARTU RINGKASAN
         ============================== */}
@@ -709,76 +587,44 @@ export default function CirclePackingPlot({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(190px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
             gap: "0.75rem",
-            marginBottom:
-              "0.5rem",
+            marginBottom: "0.5rem",
           }}
         >
           {stats.map((s, i) => {
-            const p =
-              getPalette(s.id);
+            const p = getPalette(s.id);
 
-            const dim =
-              selectedCluster != null &&
-              selectedCluster !== s.id;
+            const dim = selectedCluster != null && selectedCluster !== s.id;
 
-            const isSelected =
-              selectedCluster ===
-              s.id;
+            const isSelected = selectedCluster === s.id;
 
             return (
               <div
                 key={s.id}
-                onMouseEnter={() =>
-                  setActive(s.id)
-                }
-                onMouseLeave={() =>
-                  setActive(
-                    selectedCluster
-                  )
-                }
-                onClick={() =>
-                  onClusterClick?.(
-                    s.id
-                  )
-                }
+                onMouseEnter={() => setActive(s.id)}
+                onMouseLeave={() => setActive(selectedCluster)}
+                onClick={() => onClusterClick?.(s.id)}
                 style={{
                   display: "flex",
-                  alignItems:
-                    "center",
+                  alignItems: "center",
                   gap: 14,
-                  padding:
-                    "0.75rem 1rem",
+                  padding: "0.75rem 1rem",
                   borderRadius: 12,
-                  background:
-                    "#fff",
-                  border:
-                    "1px solid #e3e7f0",
-                  borderLeft:
-                    `5px solid ${p.outer}`,
+                  background: "#fff",
+                  border: "1px solid #e3e7f0",
+                  borderLeft: `5px solid ${p.outer}`,
                   boxShadow:
-                    isSelected ||
-                    active === s.id
+                    isSelected || active === s.id
                       ? "0 8px 20px rgba(16,33,58,0.16)"
                       : "0 2px 6px rgba(16,33,58,0.06)",
                   transform:
-                    isSelected ||
-                    active === s.id
+                    isSelected || active === s.id
                       ? "translateY(-3px)"
                       : "none",
-                  opacity: dim
-                    ? 0.45
-                    : inView
-                    ? 1
-                    : 0,
-                  transition:
-                    `all 0.25s, opacity 0.6s ${
-                      i * 0.12
-                    }s`,
-                  cursor:
-                    "pointer",
+                  opacity: dim ? 0.45 : inView ? 1 : 0,
+                  transition: `all 0.25s, opacity 0.6s ${i * 0.12}s`,
+                  cursor: "pointer",
                 }}
               >
                 <span
@@ -786,89 +632,45 @@ export default function CirclePackingPlot({
                     width: 38,
                     height: 38,
                     flex: "none",
-                    borderRadius:
-                      "50%",
-                    background:
-                      p.outer,
-                    display:
-                      "inline-flex",
-                    alignItems:
-                      "center",
-                    justifyContent:
-                      "center",
+                    borderRadius: "50%",
+                    background: p.outer,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
                   <span
                     style={{
                       width: 18,
                       height: 18,
-                      borderRadius:
-                        "50%",
-                      background:
-                        p.inner,
-                      display:
-                        "inline-block",
+                      borderRadius: "50%",
+                      background: p.inner,
+                      display: "inline-block",
                     }}
                   />
                 </span>
 
-                <span
-                  style={{
-                    lineHeight: 1.25,
-                  }}
-                >
-                  <strong
-                    style={{
-                      color: TEXT,
-                    }}
-                  >
-                    Klaster {s.id}
-                  </strong>
+                <span style={{ lineHeight: 1.25 }}>
+                  <strong style={{ color: TEXT }}>Klaster {s.id}</strong>
 
-                  <span
-                    style={{
-                      color:
-                        "#5d6781",
-                    }}
-                  >
-                    {" "}
-                    · {s.n} provinsi
+                  <span style={{ color: "#5d6781" }}> · {s.n} provinsi</span>
+
+                  <br />
+
+                  <span style={{ fontSize: "0.8rem", color: "#5d6781" }}>
+                    {s.n === 1 ? "IPM" : "Rata-rata IPM"}
                   </span>
 
                   <br />
 
                   <span
                     style={{
-                      fontSize:
-                        "0.8rem",
-                      color:
-                        "#5d6781",
-                    }}
-                  >
-                    {s.n === 1
-                      ? "IPM"
-                      : "Rata-rata IPM"}
-                  </span>
-
-                  <br />
-
-                  <span
-                    style={{
-                      fontSize:
-                        "1.35rem",
+                      fontSize: "1.35rem",
                       fontWeight: 700,
-                      color:
-                        p.outer,
+                      color: p.outer,
                     }}
                   >
-                    <CountUp
-                      value={
-                        s.mean
-                      }
-                      run={
-                        inView
-                      }
-                    />
+                    <CountUp value={s.mean} run={inView} />
                   </span>
                 </span>
               </div>
@@ -882,8 +684,12 @@ export default function CirclePackingPlot({
             width: "100%",
             height: "auto",
             display: "block",
+            flex: "none",
+            overflow: "visible",
           }}
         />
+
+        {children}
       </div>
     </div>
   );

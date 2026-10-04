@@ -1,13 +1,31 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import StorySection from "../layout/StorySection";
 import CirclePackingPlot from "../charts/CirclePackingPlot";
 import CirclePackingInterpretation from "./CirclePackingInterpretation";
 import { useClusterResult } from "../../hooks/useClusterResult";
 
+// Di bawah lebar ini interpretasi pindah ke bawah visual (HP/tablet).
+// Sesuaikan dengan breakpoint StorySection kalau berbeda.
+const STACK_BP = 900;
+
+const CSS = `
+.cp-mobile-interp { display: none; }
+@media (max-width: ${STACK_BP}px) {
+  .cp-desktop-interp { display: none; }
+  .cp-mobile-interp { display: block; margin-top: 1rem; }
+}
+`;
+
 export default function CirclePackingSection() {
   const { cut, error } = useClusterResult();
 
   const [selectedCluster, setSelectedCluster] = useState(null);
+
+  // Klik klaster yang sama lagi = batal pilih (kembali ke interpretasi umum)
+  const handleClusterClick = useCallback(
+    (id) => setSelectedCluster((prev) => (prev === id ? null : id)),
+    []
+  );
 
   const clusters = useMemo(
     () =>
@@ -35,9 +53,19 @@ export default function CirclePackingSection() {
         min: sorted[0],
         max: sorted[sorted.length - 1],
         names: c.members.map((m) => m.name),
+        members: c.members,
       };
     });
   }, [clusters]);
+
+  const renderInterpretation = (detailed) =>
+    clusters ? (
+      <CirclePackingInterpretation
+        stats={stats}
+        selectedCluster={selectedCluster}
+        detailed={detailed}
+      />
+    ) : null;
 
   return (
     <StorySection
@@ -51,12 +79,10 @@ export default function CirclePackingSection() {
             detail. Klik salah satu klaster untuk melihat interpretasinya.
           </p>
 
-          {clusters && (
-            <CirclePackingInterpretation
-              stats={stats}
-              selectedCluster={selectedCluster}
-            />
-          )}
+          <style>{CSS}</style>
+
+          {/* Desktop: interpretasi di bawah subjudul */}
+          <div className="cp-desktop-interp">{renderInterpretation(true)}</div>
         </>
       }
     >
@@ -71,8 +97,11 @@ export default function CirclePackingSection() {
         <CirclePackingPlot
           clusters={clusters}
           selectedCluster={selectedCluster}
-          onClusterClick={setSelectedCluster}
-        />
+          onClusterClick={handleClusterClick}
+        >
+          {/* HP: interpretasi di bawah visual */}
+          <div className="cp-mobile-interp">{renderInterpretation(false)}</div>
+        </CirclePackingPlot>
       )}
     </StorySection>
   );
