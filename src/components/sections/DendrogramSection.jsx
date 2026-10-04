@@ -206,6 +206,7 @@ export default function DendrogramSection() {
 
         {/* Insight: klaster yang di-hover didahulukan; kalau tidak ada, provinsi terpilih */}
         <aside
+          className="dg-aside"
           style={{
             flex: "0 0 280px",
             maxWidth: "100%",

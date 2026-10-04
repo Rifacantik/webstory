@@ -8,12 +8,22 @@ import { DIRECTION } from "../../utils/profileInsight";
 
 const SQRT_AXES = ["PDRB", "Kepadatan Penduduk"];
 const INK = "#16213a";
+const NARROW = 640; // di bawah lebar ini, label sumbu dibuat vertikal
 
 const SHORT_LABELS = {
   "Kepadatan Penduduk": "Kepadatan",
   "Laju Pertumbuhan Penduduk": "Laju Pertumbuhan",
   "Pengeluaran per Kapita": "Pengeluaran",
 };
+
+// label ringkas untuk layar sempit
+const MOBILE_LABELS = {
+  "Kepadatan Penduduk": "Kepadatan",
+  "Laju Pertumbuhan Penduduk": "Pertumbuhan",
+  "Pengeluaran per Kapita": "Pengeluaran",
+};
+
+const arrowOf = (k) => (DIRECTION[k] === "up" ? " ↑" : DIRECTION[k] === "down" ? " ↓" : "");
 
 // data: [{ name, group, ...nilai tiap dimensi }]
 export default function ParallelCoordinates({ data, dimensions }) {
@@ -24,8 +34,12 @@ export default function ParallelCoordinates({ data, dimensions }) {
   useEffect(() => {
     if (!data?.length) return;
 
+    const narrow = width < NARROW;
     const height = Math.max(340, boxH);
-    const m = { top: 84, right: 40, bottom: 24, left: 50 };
+    // layar sempit: ruang atas lebih besar untuk label vertikal
+    const m = narrow
+      ? { top: 118, right: 22, bottom: 24, left: 40 }
+      : { top: 84, right: 40, bottom: 24, left: 50 };
     const svg = d3.select(svgRef.current).attr("viewBox", `0 0 ${width} ${height}`);
     svg.selectAll("*").remove();
 
@@ -49,19 +63,30 @@ export default function ParallelCoordinates({ data, dimensions }) {
       .attr("transform", (k) => `translate(${x(k)},0)`);
 
     axes.each(function (k) {
-      d3.select(this).call(d3.axisLeft(y[k]).ticks(5, "~s"));
+      const ax = d3.axisLeft(y[k]).ticks(narrow ? 4 : 5, "~s");
+      d3.select(this).call(ax);
     });
+    if (narrow) axes.selectAll(".tick text").attr("font-size", 9);
 
-    axes.append("text")
-      .attr("y", m.top - 28)
-      .attr("text-anchor", "middle")
-      .attr("fill", INK)
-      .attr("font-weight", 600)
-      .attr("font-size", width < 640 ? 10 : 13)
-      .text((k) => SHORT_LABELS[k] ?? k);
+    if (narrow) {
+      // label vertikal (dibaca dari bawah ke atas), tepat di atas sumbu
+      axes.append("text")
+        .attr("transform", `translate(4,${m.top - 10}) rotate(-90)`)
+        .attr("text-anchor", "start")
+        .attr("fill", INK)
+        .attr("font-weight", 600)
+        .attr("font-size", 11)
+        .text((k) => `${MOBILE_LABELS[k] ?? SHORT_LABELS[k] ?? k}${arrowOf(k)}`);
+    } else {
+      axes.append("text")
+        .attr("y", m.top - 28)
+        .attr("text-anchor", "middle")
+        .attr("fill", INK)
+        .attr("font-weight", 600)
+        .attr("font-size", 13)
+        .text((k) => SHORT_LABELS[k] ?? k);
 
-    // petunjuk arah yang lebih baik, tepat di bawah judul sumbu
-    if (width >= 640) {
+      // petunjuk arah yang lebih baik, tepat di bawah judul sumbu
       axes.append("text")
         .attr("y", m.top - 12)
         .attr("text-anchor", "middle")
@@ -80,7 +105,7 @@ export default function ParallelCoordinates({ data, dimensions }) {
     // keadaan diam: kalau ada provinsi terpilih, sorot itu dan redupkan yang lain
     const applyIdle = () => {
       lines
-        .attr("stroke-width", (d) => (d.name === selected ? 4 : 1.8))
+        .attr("stroke-width", (d) => (d.name === selected ? 4 : narrow ? 1.4 : 1.8))
         .attr("stroke-opacity", (d) => (selected ? (d.name === selected ? 1 : 0.1) : 0.55));
       if (selected) lines.filter((d) => d.name === selected).raise();
     };

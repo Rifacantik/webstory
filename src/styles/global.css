@@ -192,7 +192,7 @@ p { max-width: 62ch; margin: 0 0 1rem; }
   flex: none;
   width: 100%;
   max-width: none;
-  margin: 1.5rem 0 0;      /* jarak dari grafik / legenda */
+  margin: 1.5rem 0 0;
   padding-top: 0.75rem;
   border-top: 1px solid var(--line);
   font-family: var(--font-body);
@@ -200,4 +200,29 @@ p { max-width: 62ch; margin: 0 0 1rem; }
   line-height: 1.4;
   text-align: center;
   color: var(--muted);
+}
+.pca-chart-card .source-note {
+  margin-top: 1rem;
+}
+
+/* ===== Layar kecil: matikan sticky agar teks tidak menimpa grafik =====
+   Harus berada paling bawah supaya menimpa aturan .story-section--free di atas. */
+@media (max-width: 900px) {
+  .story-section--free {
+    min-height: 0;
+  }
+  .story-section--free .story-text,
+  .story-text {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    margin-bottom: 1.5rem;
+  }
+
+  /* kartu insight dendrogram: tidak menempel, selebar kolom */
+  .dg-aside {
+    position: static !important;
+    flex: 1 1 100% !important;
+    min-height: 0 !important;
+  }
 }

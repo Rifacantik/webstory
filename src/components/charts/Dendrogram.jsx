@@ -13,6 +13,7 @@ const ABOVE_CUT = "#cfd5e2"; // cabang di atas garis potong
 const CUT_COLOR = "#c0392b";
 const SPARK = "#2a6fdb";
 const INK = "#16213a";
+const NARROW = 640; // di bawah lebar ini, teks pendukung diperkecil / dipendekkan
 const colorOf = (c) => (c < 0 ? ABOVE_CUT : CLUSTER_COLORS[c % CLUSTER_COLORS.length]);
 
 // Pengaturan animasi (ms)
@@ -125,6 +126,8 @@ export default function Dendrogram({
   useEffect(() => {
     if (!root || !assign || !width || !labelW) return;
 
+    const narrow = width < NARROW;
+
     const prevStage = prevStageRef.current;
     prevStageRef.current = stage;
     if (stage !== 1) playedRef.current = null;
@@ -139,7 +142,7 @@ export default function Dendrogram({
     const leaves = getLeaves(root);
     const rowH = 20;
     // margin kanan = lebar label terpanjang + offset teks (14) + ruang sorotan kuning
-    const m = { top: 38, right: Math.ceil(labelW) + 30, bottom: 46, left: 16 };
+    const m = { top: 38, right: Math.ceil(labelW) + 30, bottom: 50, left: 16 };
     const plotBottom = m.top + leaves.length * rowH;
     const height = plotBottom + m.bottom;
     const showCut = stage >= 2;
@@ -228,17 +231,19 @@ export default function Dendrogram({
         .attr("y", plotBottom - 8)
         .attr("font-size", 11)
         .attr("fill", CUT_COLOR)
-        .text("bagian yang dipotong");
+        .text(narrow ? "dipotong" : "bagian yang dipotong");
       if (dropCut) zone.transition().delay(500).duration(700).attr("opacity", 1);
     }
 
     // sumbu jarak
     const axisG = svg.append("g").attr("transform", `translate(0,${plotBottom + 6})`);
     axisG.call(d3.axisBottom(x).ticks(6));
+    // di layar sempit area plot kecil, jadi label rata kiri dan diberi ukuran huruf eksplisit
     const axisLabel = svg.append("text")
-      .attr("x", (m.left + width - m.right) / 2)
+      .attr("x", narrow ? m.left : (m.left + width - m.right) / 2)
       .attr("y", height - 6)
-      .attr("text-anchor", "middle")
+      .attr("text-anchor", narrow ? "start" : "middle")
+      .attr("font-size", 12)
       .attr("fill", "#5d6781")
       .text(`Jarak penggabungan${methodLabel ? ` (${methodLabel})` : ""}`);
     if (animate) {
@@ -318,14 +323,19 @@ export default function Dendrogram({
         .attr("stroke", CUT_COLOR)
         .attr("stroke-width", 2)
         .attr("stroke-dasharray", "6 4");
+      // di dekat tepi kiri (layar sempit), label rata kiri agar tidak terpotong
+      const nearLeft = xc < 140;
+      const cutText = narrow
+        ? `✂ Garis potong ≈ ${d3.format(".1f")(cutH)}`
+        : `✂ Garis potong (jarak ≈ ${d3.format(".1f")(cutH)})`;
       const label = cg.append("text")
-        .attr("x", xc)
+        .attr("x", nearLeft ? m.left : xc)
         .attr("y", m.top - 20)
-        .attr("text-anchor", "middle")
+        .attr("text-anchor", nearLeft ? "start" : "middle")
         .attr("font-size", 12)
         .attr("font-weight", 600)
         .attr("fill", CUT_COLOR)
-        .text(`✂ Garis potong (jarak ≈ ${d3.format(".1f")(cutH)})`);
+        .text(cutText);
       if (dropCut) {
         label.attr("opacity", 0).transition().duration(400).attr("opacity", 1);
         line.transition().delay(150).duration(800).ease(d3.easeCubicOut).attr("y2", plotBottom);
