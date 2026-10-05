@@ -4,9 +4,7 @@ Web story interaktif berbasis data yang menelusuri kesenjangan pembangunan antar
 
 **Demo:** https://webstory-vert.vercel.app
 
-## Alur cerita
 
-Halaman ini disusun sebagai narasi *scrollytelling*. Setiap bagian dijembatani satu pertanyaan yang mengantar ke visualisasi berikutnya.
 
 | No | Bagian | Visualisasi | Pertanyaan yang dijawab |
 |----|--------|-------------|--------------------------|
@@ -56,7 +54,6 @@ IPM, PDRB, tingkat kemiskinan, Tingkat Pengangguran Terbuka (TPT), Tingkat Parti
 
 ## Menjalankan secara lokal
 
-### Prasyarat
 
 - Node.js (disarankan versi LTS terbaru) dan npm
 - Token publik Mapbox, yang bisa dibuat gratis di [account.mapbox.com](https://account.mapbox.com)
@@ -80,16 +77,7 @@ npm run dev
 
 Buka alamat yang tampil di terminal (biasanya `http://localhost:5173`).
 
-> **Catatan:** tanpa `VITE_MAPBOX_TOKEN`, globe di bagian pembuka tidak akan tampil. Bagian lainnya tetap berjalan karena peta data memakai citra satelit Esri yang tidak memerlukan API key.
 
-### Skrip yang tersedia
-
-| Perintah | Fungsi |
-|----------|--------|
-| `npm run dev` | Menjalankan server pengembangan dengan HMR |
-| `npm run build` | Membuat build produksi di folder `dist/` |
-| `npm run preview` | Menyajikan hasil build secara lokal |
-| `npm run lint` | Menjalankan Oxlint |
 
 ## Struktur proyek
 
@@ -124,11 +112,6 @@ Proyek ini dipublikasikan di [Vercel](https://vercel.com). Saat deploy, tambahka
 
 File `.env` sudah masuk `.gitignore`. Token Mapbox pada aplikasi web selalu terlihat di sisi klien, jadi gunakan **token publik** (`pk.`) dan batasi domain yang diizinkan lewat pengaturan token di dashboard Mapbox.
 
-## Atribusi
-
-- Data: Badan Pusat Statistik (BPS), [bps.go.id](https://www.bps.go.id)
-- Globe: © Mapbox © OpenStreetMap © Maxar
-- Citra satelit peta data: Esri, Maxar, Earthstar Geographics, dan kontributor GIS
 
 ## Penyusun
 
