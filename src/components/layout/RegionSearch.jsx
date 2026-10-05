@@ -8,7 +8,6 @@ const norm = (s) =>
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
 
-// Nama tanpa awalan "Kab."/"Kota", dipakai untuk mengurutkan hasil yang diawali kata ketikan
 const bare = (s) => norm(s).replace(/^(kab\.|kota)\s*/, "");
 
 function Combobox({ label, placeholder, options, value, onPick, disabled, inputRef }) {
@@ -105,7 +104,7 @@ function Combobox({ label, placeholder, options, value, onPick, disabled, inputR
                 aria-selected={o.value === value}
                 className={`${i === cursor ? "is-active" : ""}${o.value === value ? " is-selected" : ""}`}
                 onMouseDown={(e) => {
-                  e.preventDefault(); // cegah input kehilangan fokus sebelum klik terproses
+                  e.preventDefault(); 
                   choose(o);
                 }}
                 onMouseEnter={() => setCursor(i)}
@@ -120,9 +119,6 @@ function Combobox({ label, placeholder, options, value, onPick, disabled, inputR
   );
 }
 
-// rows: isi ipm_kabkota.json
-// variant: "floating" (melayang di kiri atas peta; induknya harus position: relative/absolute)
-//          "inline"   (mengalir biasa di atas peta)
 export default function RegionSearch({ rows, variant = "inline" }) {
   const {
     provinces,
@@ -153,7 +149,7 @@ export default function RegionSearch({ rows, variant = "inline" }) {
         value={selectedProv}
         onPick={(p) => {
           pickProvince(p);
-          setTimeout(() => kabRef.current?.focus(), 0); // lanjut ke pilihan kab/kota
+          setTimeout(() => kabRef.current?.focus(), 0); 
         }}
       />
       <Combobox

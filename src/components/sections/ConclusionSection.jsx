@@ -13,7 +13,6 @@ const NUM = ["nol", "satu", "dua", "tiga", "empat", "lima", "enam", "tujuh", "de
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const ABBR = { "Nusa Tenggara Timur": "NTT", "Nusa Tenggara Barat": "NTB" };
 
-// Hitung naik dari 0 ke "to" saat elemen masuk layar
 function CountUp({ to, decimals = 0, suffix = "", duration = 1600 }) {
   const ref = useRef(null);
   const [value, setValue] = useState(0);
@@ -34,7 +33,7 @@ function CountUp({ to, decimals = 0, suffix = "", duration = 1600 }) {
         const t0 = performance.now();
         const tick = (now) => {
           const p = Math.min(1, (now - t0) / duration);
-          setValue(to * (1 - Math.pow(1 - p, 3))); // easeOutCubic
+          setValue(to * (1 - Math.pow(1 - p, 3)));
           if (p < 1) raf = requestAnimationFrame(tick);
         };
         raf = requestAnimationFrame(tick);
@@ -59,7 +58,6 @@ function CountUp({ to, decimals = 0, suffix = "", duration = 1600 }) {
   );
 }
 
-// Kalimat deskripsi tiap klaster, disusun dari anggota klaster itu sendiri
 function describeCluster(c, isLowest, isLargest) {
   if (c.size === 1) return `${c.names[0]} berdiri sendiri`;
   if (isLowest && c.size <= 6) {
@@ -74,7 +72,6 @@ function describeCluster(c, isLowest, isLargest) {
 }
 
 export default function ConclusionSection() {
-  // Klaster dihitung sekali di useClusterResult, sama persis dengan dendrogram dan circle packing
   const { rows, cut } = useClusterResult();
 
   const stats = useMemo(() => {

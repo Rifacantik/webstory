@@ -17,7 +17,6 @@ const CAPTIONS = {
 const fmt = (v) => v.toFixed(1).replace(".", ",");
 const leafName = (l) => (l && typeof l === "object" ? l.name ?? l.row?.Provinsi : l);
 
-// Penggabungan pertama sebuah provinsi: tinggi (jarak) dan pasangannya
 function mergeInfo(root, name) {
   let found = null;
   (function walk(n) {
@@ -44,12 +43,11 @@ function describeSibling(sib) {
 
 export default function DendrogramSection() {
   const { tree, cut } = useClusterResult();
-  const [stage, setStage] = useState(1); // 1 -> 2 -> 3, berjalan otomatis
+  const [stage, setStage] = useState(1); // 
   const [hovered, setHovered] = useState(null);
   const [replayKey, setReplayKey] = useState(0);
   const { selected } = useSelection();
 
-  // Jarak penggabungan pertama semua provinsi: dipakai untuk menilai "khas" atau "umum"
   const mergeStats = useMemo(() => {
     if (!tree) return null;
     const heights = getLeaves(tree)
@@ -64,7 +62,6 @@ export default function DendrogramSection() {
   const total = cut ? cut.clusters.reduce((s, c) => s + c.size, 0) : 0;
   const active = hovered != null && cut ? cut.clusters[hovered] : null;
 
-  // Insight untuk provinsi yang dipilih lewat kotak "Cari provinsi"
   const prov = useMemo(() => {
     if (!selected || !tree || !cut) return null;
     const mi = mergeInfo(tree, selected);
@@ -94,7 +91,6 @@ export default function DendrogramSection() {
     setReplayKey((k) => k + 1);
   };
 
-  // indikator alur: Dendrogram -> Garis potong -> 3 klaster -> Insight (otomatis, tidak bisa diklik)
   const reached = (i) => (i < 3 ? stage >= i + 1 : active != null || prov != null);
 
   const accent = active

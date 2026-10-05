@@ -8,7 +8,7 @@ import { DIRECTION } from "../../utils/profileInsight";
 
 const SQRT_AXES = ["PDRB", "Kepadatan Penduduk"];
 const INK = "#16213a";
-const NARROW = 640; // di bawah lebar ini, label sumbu dibuat vertikal
+const NARROW = 640;
 
 const SHORT_LABELS = {
   "Kepadatan Penduduk": "Kepadatan",
@@ -16,7 +16,6 @@ const SHORT_LABELS = {
   "Pengeluaran per Kapita": "Pengeluaran",
 };
 
-// label ringkas untuk layar sempit
 const MOBILE_LABELS = {
   "Kepadatan Penduduk": "Kepadatan",
   "Laju Pertumbuhan Penduduk": "Pertumbuhan",
@@ -25,7 +24,6 @@ const MOBILE_LABELS = {
 
 const arrowOf = (k) => (DIRECTION[k] === "up" ? " ↑" : DIRECTION[k] === "down" ? " ↓" : "");
 
-// data: [{ name, group, ...nilai tiap dimensi }]
 export default function ParallelCoordinates({ data, dimensions }) {
   const [wrapRef, width, boxH] = useSize();
   const svgRef = useRef(null);
@@ -36,7 +34,7 @@ export default function ParallelCoordinates({ data, dimensions }) {
 
     const narrow = width < NARROW;
     const height = Math.max(340, boxH);
-    // layar sempit: ruang atas lebih besar untuk label vertikal
+
     const m = narrow
       ? { top: 118, right: 22, bottom: 24, left: 40 }
       : { top: 84, right: 40, bottom: 24, left: 50 };
@@ -69,7 +67,7 @@ export default function ParallelCoordinates({ data, dimensions }) {
     if (narrow) axes.selectAll(".tick text").attr("font-size", 9);
 
     if (narrow) {
-      // label vertikal (dibaca dari bawah ke atas), tepat di atas sumbu
+  
       axes.append("text")
         .attr("transform", `translate(4,${m.top - 10}) rotate(-90)`)
         .attr("text-anchor", "start")
@@ -86,7 +84,6 @@ export default function ParallelCoordinates({ data, dimensions }) {
         .attr("font-size", 13)
         .text((k) => SHORT_LABELS[k] ?? k);
 
-      // petunjuk arah yang lebih baik, tepat di bawah judul sumbu
       axes.append("text")
         .attr("y", m.top - 12)
         .attr("text-anchor", "middle")
@@ -102,7 +99,6 @@ export default function ParallelCoordinates({ data, dimensions }) {
       .attr("stroke", (d) => groupColor(d.group))
       .style("cursor", "pointer");
 
-    // keadaan diam: kalau ada provinsi terpilih, sorot itu dan redupkan yang lain
     const applyIdle = () => {
       lines
         .attr("stroke-width", (d) => (d.name === selected ? 4 : narrow ? 1.4 : 1.8))
@@ -123,8 +119,6 @@ export default function ParallelCoordinates({ data, dimensions }) {
       })
       .on("click", (e, d) => setSelected(d.name === selected ? null : d.name));
 
-    // provinsi terpilih: titik di tiap sumbu + nama di pojok kiri atas
-    // (tidak di ujung garis, supaya tidak menimpa angka sumbu)
     const sel = selected ? data.find((d) => d.name === selected) : null;
     if (sel) {
       const g = svg.append("g").style("pointer-events", "none");

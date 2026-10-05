@@ -235,10 +235,9 @@ export default function Dendrogram({
       if (dropCut) zone.transition().delay(500).duration(700).attr("opacity", 1);
     }
 
-    // sumbu jarak
     const axisG = svg.append("g").attr("transform", `translate(0,${plotBottom + 6})`);
     axisG.call(d3.axisBottom(x).ticks(6));
-    // di layar sempit area plot kecil, jadi label rata kiri dan diberi ukuran huruf eksplisit
+
     const axisLabel = svg.append("text")
       .attr("x", narrow ? m.left : (m.left + width - m.right) / 2)
       .attr("y", height - 6)
@@ -251,7 +250,6 @@ export default function Dendrogram({
       axisLabel.attr("opacity", 0).transition().duration(700).attr("opacity", 1);
     }
 
-    // cabang
     const paths = svg.append("g")
       .attr("fill", "none")
       .attr("stroke-width", 1.8)
@@ -286,7 +284,6 @@ export default function Dendrogram({
           });
       });
 
-      // cincin kecil tiap dua cabang bertemu
       svg.append("g")
         .selectAll("circle")
         .data(sparks)
@@ -313,7 +310,6 @@ export default function Dendrogram({
         });
     }
 
-    // garis potong
     if (showCut) {
       const cg = svg.append("g");
       const line = cg.append("line")
@@ -323,7 +319,7 @@ export default function Dendrogram({
         .attr("stroke", CUT_COLOR)
         .attr("stroke-width", 2)
         .attr("stroke-dasharray", "6 4");
-      // di dekat tepi kiri (layar sempit), label rata kiri agar tidak terpotong
+
       const nearLeft = xc < 140;
       const cutText = narrow
         ? `✂ Garis potong ≈ ${d3.format(".1f")(cutH)}`
@@ -342,7 +338,6 @@ export default function Dendrogram({
       }
     }
 
-    // label provinsi
     const leafG = svg.append("g")
       .selectAll("g")
       .data(leaves)
@@ -394,7 +389,6 @@ export default function Dendrogram({
         .attr("x", 14);
     }
 
-    // area hover per klaster (hanya setelah klaster terbentuk)
     if (showColor) {
       const ranges = new Map();
       leaves.forEach((l, i) => {
@@ -421,11 +415,10 @@ export default function Dendrogram({
         .style("cursor", "pointer")
         .on("mouseenter", (_, b) => hoverCb.current?.(b.c))
         .on("mouseleave", () => hoverCb.current?.(null))
-        .on("click", (_, b) => hoverCb.current?.(b.c)); // untuk layar sentuh
+        .on("click", (_, b) => hoverCb.current?.(b.c)); 
       void bands;
     }
 
-    // otomatis lanjut ke tahap berikutnya
     let timer;
     if (stage === 1) {
       timer = setTimeout(() => stageCb.current?.(2), animate ? endMs : 300);
@@ -435,7 +428,6 @@ export default function Dendrogram({
     return () => clearTimeout(timer);
   }, [root, assign, k, stage, methodLabel, width, inView, replayKey, labelW]);
 
-  // sorot klaster yang di-hover, redupkan yang lain
   useEffect(() => {
     const svg = d3.select(svgRef.current);
     svg.selectAll(".dg-el")
@@ -453,8 +445,6 @@ export default function Dendrogram({
       });
   }, [activeCluster, stage, width, inView, root, assign, replayKey, labelW]);
 
-  // sorot provinsi pilihan: label diberi latar kuning, jalur penggabungannya
-  // (dari daun sampai akar) ditebalkan dan digambar bertahap
   useEffect(() => {
     const svg = d3.select(svgRef.current);
     svg.selectAll(".dg-sel").remove();
@@ -465,7 +455,7 @@ export default function Dendrogram({
       prevSelRef.current = selected;
       return;
     }
-    // tunggu dendrogram selesai tumbuh supaya jalur tidak muncul mendahului cabangnya
+
     if (stage === 1 && L.animate) return;
 
     const leaf = L.leaves.find((l) => leafName(l) === selected);
@@ -482,7 +472,6 @@ export default function Dendrogram({
     const yLeaf = yPos.get(leaf.id);
     const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-    // 1) latar kuning di belakang label
     const leafGroup = svg.selectAll("g.dg-el").filter(function () {
       return this.getAttribute("data-name") === selected;
     });
@@ -505,9 +494,8 @@ export default function Dendrogram({
       .attr("fill", "#ffe066")
       .attr("fill-opacity", 0.75);
 
-    // 2) jalur dari daun ke akar
     const above = svg.append("g").attr("class", "dg-sel").style("pointer-events", "none");
-    const up = [...chain].reverse(); // dari induk langsung sampai akar
+    const up = [...chain].reverse(); 
     const d =
       `M${x(0)},${yLeaf}` +
       up.map((n) => `H${x(n.height)}V${nodeY.get(n.id)}`).join("");
@@ -539,7 +527,6 @@ export default function Dendrogram({
         .attr("stroke-width", 2);
     });
 
-    // jarak penggabungan pertama, di sebelah kiri titiknya
     const first = up[0];
     above.append("text")
       .attr("x", x(first.height) - 7)
@@ -555,8 +542,6 @@ export default function Dendrogram({
       .text(`jarak ${d3.format(".1f")(first.height)}`);
   }, [selected, stage, width, inView, root, assign, replayKey, labelW]);
 
-  // gulir halaman ke provinsi terpilih bila labelnya di luar layar
-  // (hanya saat pembaca memang sedang berada di bagian dendrogram)
   useEffect(() => {
     const L = layoutRef.current;
     const svgEl = svgRef.current;

@@ -4,7 +4,6 @@ import "../../styles/province-profile.css";
 
 const LEVEL_WORD = { tinggi: "tinggi", menengah: "menengah", rendah: "rendah" };
 
-// profile: hasil buildInsights untuk provinsi terpilih, atau null
 export default function ProvinceProfile({ profile, onPick, onClear }) {
   if (!profile) {
     return (

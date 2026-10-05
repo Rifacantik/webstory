@@ -1,12 +1,6 @@
 import { motion } from "framer-motion";
 import SourceNote from "./SourceNote";
 
-// fill=true  : chart sederhana diregangkan memenuhi kolom kanan, tinggi 100vh
-// fill=false : mode bebas untuk komponen dengan layout sendiri (mis. Dendrogram),
-//              tinggi mengikuti isi dan kolom teks menempel (sticky) saat di-scroll
-// top=true   : kolom teks rata atas (sejajar dengan bagian atas chart),
-//              bukan di tengah secara vertikal
-// source     : teks sumber data di bawah grafik; false = tidak ditampilkan
 export default function StorySection({
   id,
   title,

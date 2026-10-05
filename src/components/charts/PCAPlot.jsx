@@ -44,17 +44,14 @@ const btn = {
   fontSize: "0.85rem",
 };
 
-// points: [{ name, group, cluster, pc1, pc2 }], variance: [pc1, pc2, ...]
-// focus: { names?: string[], groups?: string[] } | null  (sorotan dari kartu interpretasi)
 export default function PCAPlot({ points, variance = [], focus = null }) {
-  // wrapRef hanya membungkus area gambar, tanpa toolbar dan legenda
   const [wrapRef, width, boxH] = useSize();
   const svgRef = useRef(null);
   const scaleRef = useRef(null);
   const playedRef = useRef(null);
   const [inView, setInView] = useState(false);
   const [replayKey, setReplayKey] = useState(0);
-  const [colorBy, setColorBy] = useState("pulau"); // "pulau" | "klaster"
+  const [colorBy, setColorBy] = useState("pulau"); 
   const [showNotes, setShowNotes] = useState(true);
   const { selected, setSelected } = useSelection();
 
@@ -71,7 +68,6 @@ export default function PCAPlot({ points, variance = [], focus = null }) {
     return [...m.entries()].sort(([a], [b]) => a - b);
   }, [points]);
 
-  // Mulai animasi saat chart terlihat di layar
   useEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
@@ -92,7 +88,6 @@ export default function PCAPlot({ points, variance = [], focus = null }) {
     return () => io.disconnect();
   }, [wrapRef]);
 
-  // ---- gambar chart ----
   useEffect(() => {
     if (!points?.length) return;
 
@@ -107,7 +102,7 @@ export default function PCAPlot({ points, variance = [], focus = null }) {
     const reduced =
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    // animasi hanya sekali per putaran; resize, ganti warna, atau anotasi tidak mengulangnya
+  
     const animate = !reduced && playedRef.current !== replayKey;
     if (animate) playedRef.current = replayKey;
 
@@ -154,7 +149,7 @@ export default function PCAPlot({ points, variance = [], focus = null }) {
     }
 
     const span = width - m.right - m.left;
-    // saat titik mulai muncul (ms), mengikuti sapuan kiri ke kanan
+
     const appearAt = (d) => 300 + ((x(d.pc1) - m.left) / span) * SWEEP;
 
     const dots = svg.append("g").selectAll("circle").data(points).join("circle")
@@ -203,8 +198,6 @@ export default function PCAPlot({ points, variance = [], focus = null }) {
         .remove();
     }
 
-    // ---- anotasi: cincin + garis penunjuk + teks ----
-    // disembunyikan di layar sempit supaya tidak menutupi titik lain
     if (showNotes && width >= 560) {
       const byName = new Map(points.map((p) => [p.name, p]));
       const notes = ANNOTATIONS
@@ -217,13 +210,11 @@ export default function PCAPlot({ points, variance = [], focus = null }) {
         const px = x(a.p.pc1);
         const py = y(a.p.pc2);
 
-        // perkiraan lebar teks; balik arah bila akan keluar dari chart
         const tw = Math.max(...a.lines.map((l) => l.length)) * 6.6;
         let dx = a.dx;
         if (dx > 0 && px + dx + tw > width - 8) dx = -Math.abs(dx);
         if (dx < 0 && px + dx - tw < m.left + 4) dx = Math.abs(dx);
 
-        // jaga teks tetap di atas sumbu x
         const blockH = (a.lines.length - 1) * 16;
         let dy = a.dy;
         const maxY = height - m.bottom - 8;
@@ -279,7 +270,6 @@ export default function PCAPlot({ points, variance = [], focus = null }) {
     }
   }, [points, variance, width, boxH, inView, replayKey, colorBy, showNotes, selected, setSelected]);
 
-  // ---- sorot provinsi terpilih / wilayah dari kartu (tanpa menggambar ulang chart) ----
   useEffect(() => {
     const svg = d3.select(svgRef.current);
     svg.selectAll(".pca-sel, .pca-focus").remove();
@@ -292,7 +282,6 @@ export default function PCAPlot({ points, variance = [], focus = null }) {
 
     const p = selected && points ? points.find((d) => d.name === selected) : null;
 
-    // 1) Tidak ada pilihan manual: pakai sorotan dari kartu interpretasi
     if (!p) {
       if (!focus) {
         all.attr("opacity", 1);
@@ -313,7 +302,7 @@ export default function PCAPlot({ points, variance = [], focus = null }) {
           .attr("fill", "none")
           .attr("stroke", ACCENT)
           .attr("stroke-width", 2);
-        // label hanya untuk provinsi tunggal yang belum punya anotasi
+
         if (focus.names?.includes(d.name) && !annotated.has(d.name)) {
           g.append("text")
             .attr("x", px).attr("y", py - 20)
@@ -331,7 +320,6 @@ export default function PCAPlot({ points, variance = [], focus = null }) {
       return;
     }
 
-    // 2) Ada pilihan manual: perilaku lama
     all.attr("opacity", (d) => (d.name === selected ? 1 : 0.3));
     all.filter((d) => d.name === selected).raise();
 

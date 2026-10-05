@@ -6,8 +6,7 @@ import { useRegionSelection } from "../../hooks/useRegionSelection";
 import { buildStats, ipmNote } from "../../utils/kabkotaStats";
 import "../../styles/map-stage.css";
 
-// File di folder public/data/
-const GEO_URL = "/data/all_kabkota_ind.geojson"; // atau all_kabkota_ind.slim.geojson (lebih ringan)
+const GEO_URL = "/data/all_kabkota_ind.geojson"; 
 const IPM_URL = "/data/ipm_kabkota.json";
 
 const fmt = (v) =>
@@ -18,20 +17,16 @@ export default function ChoroplethSection() {
   const { data: ipm, error: ipmError, loading: ipmLoading } = useData(IPM_URL, "json");
   const [focused, setFocused] = useState(false);
 
-  // Pilihan provinsi/kab-kota bersama (SelectionContext) -> target zoom untuk peta
   const { target, pickKab } = useRegionSelection(ipm);
   const handlePick = useCallback((f) => pickKab(f.properties.mhid), [pickKab]);
 
-  // Join GeoJSON <-> data IPM lewat 'mhid' (kunci unik tiap kab/kota di GeoJSON)
   const byId = useMemo(() => {
     if (!ipm) return new Map();
     return new Map(ipm.map((d) => [d.mhid, d]));
   }, [ipm]);
 
-  // Peringkat, rata-rata nasional & provinsi (untuk interpretasi di tooltip)
   const stats = useMemo(() => (ipm ? buildStats(ipm) : null), [ipm]);
 
-  // Temuan tertulis, dihitung dari data (kategori IPM menurut BPS)
   const finding = useMemo(() => {
     if (!ipm) return null;
     const valid = ipm.filter((d) => Number.isFinite(d.ipm));

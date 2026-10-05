@@ -36,7 +36,6 @@ export default function ParallelCoordinatesSection() {
       .catch((err) => console.error("Gagal membaca data:", err));
   }, []);
 
-  // Peringkat, kalimat ringkasan, dan provinsi mirip untuk semua provinsi
   const insights = useMemo(
     () => (rows.length ? buildInsights(rows, FEATURES) : null),
     [rows]

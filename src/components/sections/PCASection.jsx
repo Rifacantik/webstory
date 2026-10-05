@@ -7,9 +7,6 @@ import { getIsland } from "../../utils/regions";
 import { useClusterResult, FEATURES } from "../../hooks/useClusterResult";
 import "../../styles/pca-scrolly.css";
 
-// Penyesuaian layout KHUSUS DESKTOP (>= 960px): kontainer lebih lebar,
-// interpretasi di kiri, grafik di kanan dan dibuat jauh lebih lebar.
-// HP/tablet tidak disentuh, tetap memakai pca-scrolly.css.
 const DESKTOP_CSS = `
 @media (min-width: 960px) {
   .pca-section {

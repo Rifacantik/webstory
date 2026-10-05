@@ -50,7 +50,6 @@ export default function ProvinceSelect() {
     };
   }, []);
 
-  // Samakan isi kotak dengan provinsi terpilih (juga saat dipilih lewat klik di chart)
   useEffect(() => {
     setText(selected ?? "");
   }, [selected]);

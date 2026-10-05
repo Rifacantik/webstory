@@ -4,8 +4,6 @@ import CirclePackingPlot from "../charts/CirclePackingPlot";
 import CirclePackingInterpretation from "./CirclePackingInterpretation";
 import { useClusterResult } from "../../hooks/useClusterResult";
 
-// Di bawah lebar ini interpretasi pindah ke bawah visual (HP/tablet).
-// Sesuaikan dengan breakpoint StorySection kalau berbeda.
 const STACK_BP = 900;
 
 const CSS = `
@@ -21,7 +19,6 @@ export default function CirclePackingSection() {
 
   const [selectedCluster, setSelectedCluster] = useState(null);
 
-  // Klik klaster yang sama lagi = batal pilih (kembali ke interpretasi umum)
   const handleClusterClick = useCallback(
     (id) => setSelectedCluster((prev) => (prev === id ? null : id)),
     []

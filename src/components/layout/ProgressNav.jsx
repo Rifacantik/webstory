@@ -50,7 +50,6 @@ export default function ProgressNav() {
       const p = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
       if (barRef.current) barRef.current.style.transform = `scaleX(${p})`;
 
-      // bab aktif = section yang melewati garis tengah layar
       const mid = window.innerHeight / 2;
       let current = null;
       for (const c of items) {

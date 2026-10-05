@@ -15,17 +15,6 @@ const MAX_ZOOM = 14;    // batas pembesaran maksimum
 const FIT = 0.7;        // wilayah memenuhi ±70% layar saat di-zoom
 const EDGE = 24;        // jarak peta dari tepi area (mode fill)
 
-// geo: GeoJSON FeatureCollection
-// getValue(feature, index) -> angka | getName(feature) -> string
-// satellite: true -> basemap satelit, false -> peta abu-abu polos
-// fill: true -> mengisi penuh elemen induknya (position: absolute; inset: 0), seperti Choropleth
-// onFocusChange(true|false) -> dipanggil saat peta masuk/keluar dari zoom ke satu wilayah
-// Hover (diam 0,3 detik) -> zoom sementara; kursor keluar dari peta -> kembali ke seluruh Indonesia.
-// target: null | { ids: [mhid...], kab: mhid | null }
-//   Dari kotak pencarian/context. Peta zoom ke provinsi (atau kab/kota bila `kab` ada),
-//   wilayah lain diredupkan. Selama target ada, zoom otomatis saat hover dimatikan.
-// onPick(feature) -> dipanggil saat wilayah diklik (memilih/mengunci wilayah). Bila tidak ada,
-//   klik hanya zoom ke wilayah itu seperti sebelumnya.
 export default function ProportionalSymbol({
   geo,
   getValue,

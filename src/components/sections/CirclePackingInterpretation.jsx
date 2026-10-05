@@ -70,7 +70,6 @@ function StatBox({ label, value }) {
   );
 }
 
-// Bagian tambahan (hanya desktop): ringkasan angka + konteks + daftar anggota
 function Detail({ stats, selected }) {
   const total = stats.reduce((a, s) => a + s.n, 0);
   const overall = stats.reduce((a, s) => a + s.mean * s.n, 0) / total;

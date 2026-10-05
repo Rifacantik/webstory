@@ -6,8 +6,7 @@ import { useRegionSelection } from "../../hooks/useRegionSelection";
 import { buildStats, pdrbNote } from "../../utils/kabkotaStats";
 import "../../styles/map-stage.css";
 
-// File di folder public/data/
-const GEO_URL = "/data/all_kabkota_ind.geojson"; // atau all_kabkota_ind.slim.geojson (lebih ringan)
+const GEO_URL = "/data/all_kabkota_ind.geojson"; 
 const DATA_URL = "/data/ipm_kabkota.json";
 
 export default function ProportionalSymbolSection() {
@@ -15,20 +14,16 @@ export default function ProportionalSymbolSection() {
   const { data: rows, error: dataError, loading: dataLoading } = useData(DATA_URL, "json");
   const [focused, setFocused] = useState(false);
 
-  // Pilihan provinsi/kab-kota bersama (SelectionContext) -> target zoom untuk peta
   const { target, pickKab } = useRegionSelection(rows);
   const handlePick = useCallback((f) => pickKab(f.properties.mhid), [pickKab]);
 
-  // Join GeoJSON <-> data lewat 'mhid'
   const byId = useMemo(() => {
     if (!rows) return new Map();
     return new Map(rows.map((d) => [d.mhid, d]));
   }, [rows]);
 
-  // Peringkat & median (untuk interpretasi)
   const stats = useMemo(() => (rows ? buildStats(rows) : null), [rows]);
 
-  // Urutkan PDRB terbesar -> terkecil agar lingkaran kecil tetap terlihat di atas
   const sortedGeo = useMemo(() => {
     if (!geo || byId.size === 0) return null;
     const features = [...geo.features].sort(

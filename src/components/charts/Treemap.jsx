@@ -4,7 +4,6 @@ import { useSize } from "../../hooks/useSize";
 import { getTooltip } from "../../hooks/useTooltip";
 import { groupColor } from "../../utils/colors";
 
-// data: { name, children: [{ name, children|value }] }
 export default function Treemap({ data }) {
   const [wrapRef, width, boxH] = useSize(); 
   const svgRef = useRef(null);
