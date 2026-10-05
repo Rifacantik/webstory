@@ -24,8 +24,6 @@ export default function PCAInterpretation({
       id: "cara-membaca",
       focus: null,
 
-      title: "Cara membaca grafik ini",
-
       body: (
         <p>
           Dua komponen utama pada grafik menjelaskan sekitar{" "}
@@ -41,7 +39,7 @@ export default function PCAInterpretation({
       id: "sumbu",
       focus: null,
 
-      title: "Apa yang dibedakan oleh tiap sumbu",
+      title: "Apa yang dibedakan oleh tiap sumbu?",
 
       body: (
         <ul>

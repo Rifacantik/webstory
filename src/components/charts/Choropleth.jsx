@@ -5,39 +5,25 @@ import { useSize } from "../../hooks/useSize";
 import { getTooltip } from "../../hooks/useTooltip";
 import { sequential } from "../../utils/colors";
 
-const DWELL_MS = 300;   // kursor harus diam sebentar di wilayah sebelum zoom (mencegah zoom tak sengaja)
-const RESET_MS = 250;   // jeda sebelum zoom kembali saat kursor keluar dari peta
-const MAX_ZOOM = 14;    // batas pembesaran maksimum
-const FIT = 0.7;        // wilayah memenuhi ±70% layar saat di-zoom
-const EDGE = 24;        // jarak peta dari tepi area
-const FILL = 0.78;         // keburaman warna choropleth (sisanya memperlihatkan satelit)
-const DIM = 0.1;           // wilayah di luar provinsi terpilih
-const DIM_SIBLING = 0.35;  // kab/kota lain di provinsi yang sama, saat satu kab/kota dipilih
-const ACCENT = "#f97316";  // warna garis sorot wilayah terpilih
-const STROKE = "rgba(255,255,255,0.55)"; // batas wilayah di atas satelit
+const DWELL_MS = 300;   
+const RESET_MS = 250;   
+const MAX_ZOOM = 14;    
+const FIT = 0.7;        
+const EDGE = 24;        
+const FILL = 0.78;         
+const DIM = 0.1;           
+const DIM_SIBLING = 0.35;  
+const ACCENT = "#f97316";  
+const STROKE = "rgba(255,255,255,0.55)"; 
 
-// ---- Base map satelit ----
-// Peta data memakai citra Esri World Imagery (tanpa token), sama dengan peta PDRB.
-// Mapbox hanya dipakai di globe.
 const TILE_SIZE = 256;
-const SEA = "#16384a"; // warna latar di balik ubin (mendekati warna laut Esri)
+const SEA = "#16384a"; 
 
 const tileUrl = ([x, y, z]) =>
   `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
 
 const ATTRIBUTION = "Tiles © Esri — Maxar, Earthstar Geographics, dan kontributor GIS";
 
-// geo: GeoJSON FeatureCollection
-// getValue(feature, index) -> angka | getName(feature) -> string
-// Hover (diam 0,3 detik) -> zoom sementara; kursor keluar dari peta -> kembali ke seluruh Indonesia.
-// getNote(feature) -> string HTML interpretasi (opsional), ditampilkan di tooltip saat hover
-// onFocusChange(true|false) -> dipanggil saat peta masuk/keluar dari zoom ke satu wilayah
-// target: null | { ids: [mhid...], kab: mhid | null }
-//   Dari kotak pencarian/context. Peta zoom ke provinsi (atau kab/kota bila `kab` ada),
-//   wilayah lain diredupkan. Selama target ada, zoom otomatis saat hover dimatikan.
-// onPick(feature) -> dipanggil saat wilayah diklik (memilih/mengunci wilayah). Bila tidak ada,
-//   klik hanya zoom ke wilayah itu seperti sebelumnya.
-// Komponen ini mengisi penuh elemen induknya (position: absolute; inset: 0).
 export default function Choropleth({
   geo,
   getValue,
@@ -74,9 +60,7 @@ export default function Choropleth({
     const color = sequential(d3.extent(values));
     const tip = getTooltip();
 
-    // ---- lapisan ubin satelit (di bawah polygon) ----
-    // gBase: ubin resolusi rendah, ikut transformasi zoom (selalu ada, mencegah area kosong)
-    // gDetail: ubin resolusi menyesuaikan zoom, digambar ulang di koordinat layar
+
     const [px, py] = projection.translate();
     const s0 = projection.scale();
     const tiler = d3Tile().tileSize(TILE_SIZE).size([width, height]);
@@ -129,7 +113,6 @@ export default function Choropleth({
       .attr("vector-effect", "non-scaling-stroke") // garis tetap tipis saat zoom
       .style("cursor", "zoom-in");
 
-    // ---- legenda (koordinat layar, tidak ikut zoom) di kanan bawah ----
     const drawLegend = () => {
       const ext = d3.extent(values);
       if (ext[0] == null || ext[0] === ext[1]) return;
@@ -176,7 +159,6 @@ export default function Choropleth({
     };
     drawLegend();
 
-    // atribusi sumber citra satelit
     svg.append("text")
       .attr("x", width - 8)
       .attr("y", height - 8)
@@ -189,12 +171,11 @@ export default function Choropleth({
       .style("pointer-events", "none")
       .text(ATTRIBUTION);
 
-    // ---- zoom ----
     let view = { k: 1, tx: 0, ty: 0 };
-    let marked = new Set();   // wilayah yang diberi garis tebal
-    let dim = null;           // Set mhid provinsi terpilih; wilayah lain diredupkan
-    let focusId = null;       // mhid kab/kota terpilih (tetangganya ikut diredupkan)
-    let external = false;     // true saat zoom berasal dari pilihan (pencarian/klik), bukan hover
+    let marked = new Set();   
+    let dim = null;           
+    let focusId = null;       
+    let external = false;    
     let syncedTarget = null;
     let animating = false;
     let lockUntil = 0;
@@ -255,7 +236,6 @@ export default function Choropleth({
       animating = false;
     };
 
-    // view yang memuat semua wilayah di `fs`
     const viewFor = (fs) => {
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
       for (const f of fs) {
@@ -282,14 +262,13 @@ export default function Choropleth({
     };
 
     const resetZoom = () => {
-      if (external) return; // pilihan dari pencarian/klik dipertahankan sampai di-Reset
+      if (external) return; 
       marked = new Set();
       highlight();
       focusCb.current?.(false);
       if (view.k > 1.001 || animating) animateTo({ k: 1, tx: 0, ty: 0 });
     };
 
-    // Menyamakan peta dengan `target` dari luar (pencarian, klik, atau chart lain)
     const sync = (instant) => {
       const t = targetRef.current ?? null;
       if (t === syncedTarget) return;
@@ -349,8 +328,8 @@ export default function Choropleth({
       })
       .on("click", (e, d) => {
         clearTimeout(dwellTimer);
-        if (pickRef.current) pickRef.current(d); // pilih/kunci wilayah -> target berubah -> sync()
-        else zoomToFeature(d);                   // layar sentuh tanpa pilihan
+        if (pickRef.current) pickRef.current(d); 
+        else zoomToFeature(d);                 
       });
 
     svg
@@ -361,9 +340,9 @@ export default function Choropleth({
         resetTimer = setTimeout(resetZoom, RESET_MS);
       });
 
-    apply(view); // gambar ubin awal
+    apply(view); 
     apiRef.current = { sync: () => sync(false) };
-    sync(true); // peta dibangun ulang (mis. resize): langsung ke pilihan terakhir tanpa animasi
+    sync(true); 
 
     return () => {
       apiRef.current = null;
@@ -375,7 +354,6 @@ export default function Choropleth({
     };
   }, [geo, width, boxH, getValue, getName, getNote, label]);
 
-  // Pilihan berubah (tanpa membangun ulang peta)
   useEffect(() => {
     apiRef.current?.sync();
   }, [target]);

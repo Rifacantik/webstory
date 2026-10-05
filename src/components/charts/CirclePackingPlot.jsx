@@ -23,8 +23,6 @@ const fmt = (v) =>
     maximumFractionDigits: 2,
   });
 
-// Khusus HP: paksa container induk tidak mengunci tinggi / menyusutkan chart,
-// sehingga "Sumber data" selalu berada di bawah chart (tidak tumpang tindih).
 const MOBILE_FIX_CSS = `
 @media (max-width: ${MOBILE_BP + 80}px) {
   .chart-wrap:has(.cp-root) {
@@ -149,8 +147,6 @@ export default function CirclePackingPlot({
   const svgRef = useRef(null);
   const playedRef = useRef(false);
 
-  // Simpan callback & klaster terpilih di ref supaya SVG tidak digambar
-  // ulang setiap kali klaster diklik (menghindari kedip & event hilang).
   const onClickRef = useRef(onClusterClick);
   const selectedRef = useRef(selectedCluster);
   onClickRef.current = onClusterClick;
@@ -169,8 +165,6 @@ export default function CirclePackingPlot({
     );
   }, []);
 
-  // Tooltip harus hilang saat halaman di-scroll (atau disentuh di luar
-  // grafik di HP), karena mouseleave tidak ikut terpicu saat scroll.
   useEffect(() => {
     const tip = getTooltip();
     const hide = () => tip.hide();
@@ -179,7 +173,6 @@ export default function CirclePackingPlot({
       if (!svgRef.current?.contains(e.target)) hide();
     };
 
-    // capture: true supaya scroll di container bersarang juga tertangkap
     window.addEventListener("scroll", hide, { passive: true, capture: true });
     window.addEventListener("wheel", hide, { passive: true });
     window.addEventListener("touchmove", hide, { passive: true });
@@ -234,14 +227,12 @@ export default function CirclePackingPlot({
   useEffect(() => {
     if (!clusters?.length || !width || !fontsReady) return;
 
-    // Desktop: kanvas lebih tinggi supaya lingkaran lebih besar dan ruang
-    // kosong di bawah berkurang. HP/tablet kecil tetap seperti semula.
     const size =
       width >= 700 ? Math.min(width * 0.9, 900) : Math.min(width, 720);
 
     const padX = 24;
     const padT = 46;
-    // HP: ruang bawah lebih besar supaya label "Klaster 1" tidak terpotong
+
     const padB = width < MOBILE_BP ? 56 : 24;
 
     const svg = d3
@@ -335,9 +326,6 @@ export default function CirclePackingPlot({
 
     const tip = getTooltip();
 
-    // ==============================
-    // LINGKARAN LUAR: KLASTER
-    // ==============================
 
     g.append("g")
       .selectAll("circle")
@@ -386,9 +374,6 @@ export default function CirclePackingPlot({
           .attr("r", d.r);
       });
 
-    // ==============================
-    // LINGKARAN PROVINSI
-    // ==============================
 
     const leaf = g
       .append("g")
@@ -412,7 +397,6 @@ export default function CirclePackingPlot({
       .attr("stroke", (d) => getPalette(d.data.clusterId).outer)
       .attr("stroke-width", 1.5);
 
-    // LABEL PROVINSI
 
     zoom.each(function (d) {
       const { lines, fs } = bestLayout(d.data.name, d.r);
@@ -442,9 +426,6 @@ export default function CirclePackingPlot({
         .attr("transform", "scale(1)");
     }
 
-    // ==============================
-    // HOVER PROVINSI
-    // ==============================
 
     leaf
       .on("mouseenter", function (e, d) {
@@ -547,9 +528,6 @@ export default function CirclePackingPlot({
     fontsReady,
   ]);
 
-  // ==============================
-  // HIGHLIGHT KLASTER
-  // ==============================
 
   useEffect(() => {
     const current = active ?? selectedCluster;
